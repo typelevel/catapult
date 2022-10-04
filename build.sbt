@@ -20,7 +20,19 @@ val Scala213 = "2.13.8"
 ThisBuild / crossScalaVersions := Seq(Scala213, "3.1.1")
 ThisBuild / scalaVersion := Scala213 // the default Scala
 
-lazy val root = tlCrossRootProject.aggregate(core)
+lazy val root = tlCrossRootProject.aggregate(core, testkit)
+
+lazy val testkit = crossProject(JVMPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("testkit"))
+  .settings(
+    name := "launch-catsly-testkit",
+    libraryDependencies ++= Seq(
+      "com.disneystreaming" %% "weaver-cats" % "0.7.12" % Test
+    ),
+    testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
+  )
+  .dependsOn(core)
 
 lazy val core = crossProject(JVMPlatform)
   .crossType(CrossType.Pure)
@@ -32,8 +44,6 @@ lazy val core = crossProject(JVMPlatform)
       "org.typelevel" %%% "cats-effect" % "3.3.14",
       "co.fs2" %%% "fs2-core" % "3.3.0",
       "com.launchdarkly" % "launchdarkly-java-server-sdk" % "5.10.2",
-      "org.scalameta" %%% "munit" % "0.7.29" % Test,
-      "org.typelevel" %%% "munit-cats-effect-3" % "1.0.7" % Test,
     ),
   )
 
