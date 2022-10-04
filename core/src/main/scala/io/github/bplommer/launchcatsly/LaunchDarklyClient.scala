@@ -16,11 +16,15 @@
 
 package io.github.bplommer.launchcatsly
 
-import cats.effect.{Resource, Sync}
+import cats.effect.std.{Dispatcher, Queue}
+import cats.effect.{Async, Resource}
+import cats.~>
+import com.launchdarkly.sdk.server.interfaces.{FlagChangeEvent, FlagChangeListener}
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
 import com.launchdarkly.sdk.{LDUser, LDValue}
+import fs2._
 
-trait LaunchDarklyClient[F[_]] { self =>
+trait LaunchDarklyClient[F[_]] {
   def unsafeWithJavaClient[A](f: LDClient => A): F[A]
 
   def boolVariation(featureKey: String, user: LDUser, defaultValue: Boolean): F[Boolean]
@@ -31,12 +35,14 @@ trait LaunchDarklyClient[F[_]] { self =>
 
   def doubleVariation(featureKey: String, user: LDUser, defaultValue: Double): F[Double]
 
+  def listen(featureKey: String, user: LDUser): Stream[F, FlagChangeEvent]
+
   def jsonVariation(featureKey: String, user: LDUser, defaultValue: LDValue): F[LDValue]
 }
 
 object LaunchDarklyClient {
   def resource[F[_]](sdkKey: String, config: LDConfig)(implicit
-      F: Sync[F]
+      F: Async[F]
   ): Resource[F, LaunchDarklyClient[F]] =
     Resource
       .make(F.blocking(new LDClient(sdkKey, config)))(cl => F.blocking(cl.close()))
@@ -44,12 +50,29 @@ object LaunchDarklyClient {
         new LaunchDarklyClient.Default[F] {
 
           override def unsafeWithJavaClient[A](f: LDClient => A): F[A] =
-            F.blocking(f(ldClient))
+            F.delay(f(ldClient))
 
+          override def listen(featureKey: String, user: LDUser): Stream[F, FlagChangeEvent] =
+            Stream.eval(F.delay(ldClient.getFlagTracker)).flatMap { tracker =>
+              Stream.resource(Dispatcher[F]).flatMap { dispatcher =>
+                Stream.eval(Queue.unbounded[F, FlagChangeEvent]).flatMap { q =>
+                  val listener = new FlagChangeListener {
+                    override def onFlagChange(event: FlagChangeEvent): Unit =
+                      dispatcher.unsafeRunSync(q.offer(event))
+                  }
+
+                  Stream.bracket(F.delay(tracker.addFlagChangeListener(listener)))(_ =>
+                    F.delay(tracker.removeFlagChangeListener(listener))
+                  ) >>
+                    Stream.fromQueueUnterminated(q)
+                }
+              }
+            }
         }
       }
 
-  private trait Default[F[_]] extends LaunchDarklyClient[F] {
+  trait Default[F[_]] extends LaunchDarklyClient[F] {
+    self =>
     override def boolVariation(featureKey: String, user: LDUser, default: Boolean): F[Boolean] =
       unsafeWithJavaClient(_.boolVariation(featureKey, user, default))
 
