@@ -57,8 +57,10 @@ object LaunchDarklyClient {
               Stream.resource(Dispatcher[F]).flatMap { dispatcher =>
                 Stream.eval(Queue.unbounded[F, FlagValueChangeEvent]).flatMap { q =>
                   val listener = new FlagValueChangeListener {
-                    override def onFlagValueChange(event: FlagValueChangeEvent): Unit =
+                    override def onFlagValueChange(event: FlagValueChangeEvent): Unit = {
+                      println(s"Flag change event: ${event.getKey}: ${event.getOldValue.toString} -> ${event.getNewValue.toString}")
                       dispatcher.unsafeRunSync(q.offer(event))
+                    }
                   }
 
                   Stream.bracket(
