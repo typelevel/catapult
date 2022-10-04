@@ -57,10 +57,10 @@ object VariationTests extends SimpleIOSuite {
               .compile
               .drain
           )
-          _ <- IO.sleep(3000.millis)
+          _ <- IO.sleep(5000.millis)
           _ <- setFooFlag("value1")
           _ <- setFooFlag("value2")
-          _ <- IO.sleep(3000.millis)
+          _ <- IO.sleep(5000.millis)
           result <- received.get
         } yield expect(
           result.map(event =>
