@@ -19,7 +19,7 @@ package io.github.bplommer.launchcatsly
 import cats.effect.std.{Dispatcher, Queue}
 import cats.effect.{Async, Resource}
 import cats.~>
-import com.launchdarkly.sdk.server.interfaces.{FlagChangeEvent, FlagChangeListener}
+import com.launchdarkly.sdk.server.interfaces.{FlagValueChangeEvent, FlagValueChangeListener}
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
 import com.launchdarkly.sdk.{LDUser, LDValue}
 import fs2._
@@ -33,7 +33,7 @@ trait LaunchDarklyClient[F[_]] {
 
   def doubleVariation(featureKey: String, user: LDUser, defaultValue: Double): F[Double]
 
-  def listen(featureKey: String, user: LDUser): Stream[F, FlagChangeEvent]
+  def listen(featureKey: String, user: LDUser): Stream[F, FlagValueChangeEvent]
 
   def jsonVariation(featureKey: String, user: LDUser, defaultValue: LDValue): F[LDValue]
 
@@ -52,18 +52,18 @@ object LaunchDarklyClient {
           override def unsafeWithJavaClient[A](f: LDClient => A): F[A] =
             F.delay(f(ldClient))
 
-          override def listen(featureKey: String, user: LDUser): Stream[F, FlagChangeEvent] =
+          override def listen(featureKey: String, user: LDUser): Stream[F, FlagValueChangeEvent] =
             Stream.eval(F.delay(ldClient.getFlagTracker)).flatMap { tracker =>
               Stream.resource(Dispatcher[F]).flatMap { dispatcher =>
-                Stream.eval(Queue.unbounded[F, FlagChangeEvent]).flatMap { q =>
-                  val listener = new FlagChangeListener {
-                    override def onFlagChange(event: FlagChangeEvent): Unit =
+                Stream.eval(Queue.unbounded[F, FlagValueChangeEvent]).flatMap { q =>
+                  val listener = new FlagValueChangeListener {
+                    override def onFlagValueChange(event: FlagValueChangeEvent): Unit =
                       dispatcher.unsafeRunSync(q.offer(event))
                   }
 
-                  Stream.bracket(F.delay(tracker.addFlagChangeListener(listener)))(_ =>
-                    F.delay(tracker.removeFlagChangeListener(listener))
-                  ) >>
+                  Stream.bracket(
+                    F.delay(tracker.addFlagValueChangeListener(featureKey, user, listener))
+                  )(listener => F.delay(tracker.removeFlagChangeListener(listener))) >>
                     Stream.fromQueueUnterminated(q)
                 }
               }
@@ -95,7 +95,7 @@ object LaunchDarklyClient {
         self.unsafeWithJavaClient(f)
       )
 
-      override def listen(featureKey: String, user: LDUser): Stream[G, FlagChangeEvent] =
+      override def listen(featureKey: String, user: LDUser): Stream[G, FlagValueChangeEvent] =
         self.listen(featureKey, user).translate(fk)
     }
   }
