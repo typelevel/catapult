@@ -25,11 +25,12 @@ lazy val root = tlCrossRootProject.aggregate(core, testkit)
 lazy val testkit = crossProject(JVMPlatform)
   .crossType(CrossType.Pure)
   .in(file("testkit"))
-  .settings(name := "launch-catsly-testkit",
+  .settings(
+    name := "launch-catsly-testkit",
     libraryDependencies ++= Seq(
-      "com.disneystreaming" %% "weaver-cats" % "0.7.12" % IntegrationTest,
+      "com.disneystreaming" %% "weaver-cats" % "0.7.12" % Test
     ),
-    testFrameworks += new TestFramework("weaver.framework.CatsEffect")
+    testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
   )
   .dependsOn(core)
 
