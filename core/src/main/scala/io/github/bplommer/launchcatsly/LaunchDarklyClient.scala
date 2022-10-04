@@ -40,7 +40,8 @@ object LaunchDarklyClient {
   def resource[F[_]](sdkKey: String, config: LDConfig)(implicit
       F: Sync[F]
   ): Resource[F, LaunchDarklyClient[F]] =
-    Resource.fromAutoCloseable(F.blocking(new LDClient(sdkKey, config)))
+    Resource
+      .fromAutoCloseable(F.blocking(new LDClient(sdkKey, config)))
       .map { ldClient =>
         new LaunchDarklyClient.Default[F] {
 
