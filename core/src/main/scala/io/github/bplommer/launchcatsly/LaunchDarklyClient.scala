@@ -16,13 +16,15 @@
 
 package io.github.bplommer.launchcatsly
 
-import cats.effect.{Resource, Sync}
+import cats.effect.std.{Dispatcher, Queue}
+import cats.effect.{Async, Resource}
 import cats.~>
+import com.launchdarkly.sdk.server.interfaces.{FlagValueChangeEvent, FlagValueChangeListener}
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
 import com.launchdarkly.sdk.{LDUser, LDValue}
+import fs2._
 
-trait LaunchDarklyClient[F[_]] { self =>
-
+trait LaunchDarklyClient[F[_]] {
   def boolVariation(featureKey: String, user: LDUser, defaultValue: Boolean): F[Boolean]
 
   def stringVariation(featureKey: String, user: LDUser, defaultValue: String): F[String]
@@ -33,12 +35,16 @@ trait LaunchDarklyClient[F[_]] { self =>
 
   def jsonVariation(featureKey: String, user: LDUser, defaultValue: LDValue): F[LDValue]
 
+  def listen(featureKey: String, user: LDUser): Stream[F, FlagValueChangeEvent]
+
+  def flush: F[Unit]
+
   def mapK[G[_]](fk: F ~> G): LaunchDarklyClient[G]
 }
 
 object LaunchDarklyClient {
   def resource[F[_]](sdkKey: String, config: LDConfig)(implicit
-      F: Sync[F]
+      F: Async[F]
   ): Resource[F, LaunchDarklyClient[F]] =
     Resource
       .fromAutoCloseable(F.blocking(new LDClient(sdkKey, config)))
@@ -46,8 +52,24 @@ object LaunchDarklyClient {
         new LaunchDarklyClient.Default[F] {
 
           override def unsafeWithJavaClient[A](f: LDClient => A): F[A] =
-            F.blocking(f(ldClient))
+            F.delay(f(ldClient))
 
+          override def listen(featureKey: String, user: LDUser): Stream[F, FlagValueChangeEvent] =
+            Stream.eval(F.delay(ldClient.getFlagTracker)).flatMap { tracker =>
+              Stream.resource(Dispatcher[F]).flatMap { dispatcher =>
+                Stream.eval(Queue.unbounded[F, FlagValueChangeEvent]).flatMap { q =>
+                  val listener = new FlagValueChangeListener {
+                    override def onFlagValueChange(event: FlagValueChangeEvent): Unit =
+                      dispatcher.unsafeRunSync(q.offer(event))
+                  }
+
+                  Stream.bracket(
+                    F.delay(tracker.addFlagValueChangeListener(featureKey, user, listener))
+                  )(listener => F.delay(tracker.removeFlagChangeListener(listener))) >>
+                    Stream.fromQueueUnterminated(q)
+                }
+              }
+            }
         }
       }
 
@@ -70,10 +92,17 @@ object LaunchDarklyClient {
     override def jsonVariation(featureKey: String, user: LDUser, default: LDValue): F[LDValue] =
       unsafeWithJavaClient(_.jsonValueVariation(featureKey, user, default))
 
+    override def flush: F[Unit] = unsafeWithJavaClient(_.flush())
+
     override def mapK[G[_]](fk: F ~> G): LaunchDarklyClient[G] = new LaunchDarklyClient.Default[G] {
       override def unsafeWithJavaClient[A](f: LDClient => A): G[A] = fk(
         self.unsafeWithJavaClient(f)
       )
+
+      override def listen(featureKey: String, user: LDUser): Stream[G, FlagValueChangeEvent] =
+        self.listen(featureKey, user).translate(fk)
+
+      override def flush: G[Unit] = fk(self.flush)
     }
   }
 }
