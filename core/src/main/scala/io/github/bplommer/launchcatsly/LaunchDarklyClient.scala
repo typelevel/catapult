@@ -17,6 +17,7 @@
 package io.github.bplommer.launchcatsly
 
 import cats.effect.{Resource, Sync}
+import cats.~>
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
 import com.launchdarkly.sdk.{LDUser, LDValue}
 
@@ -32,6 +33,8 @@ trait LaunchDarklyClient[F[_]] { self =>
   def doubleVariation(featureKey: String, user: LDUser, defaultValue: Double): F[Double]
 
   def jsonVariation(featureKey: String, user: LDUser, defaultValue: LDValue): F[LDValue]
+
+  def mapK[G[_]](fk: F ~> G): LaunchDarklyClient[G]
 }
 
 object LaunchDarklyClient {
@@ -49,7 +52,8 @@ object LaunchDarklyClient {
         }
       }
 
-  private trait Default[F[_]] extends LaunchDarklyClient[F] {
+  trait Default[F[_]] extends LaunchDarklyClient[F] {
+    self =>
     override def boolVariation(featureKey: String, user: LDUser, default: Boolean): F[Boolean] =
       unsafeWithJavaClient(_.boolVariation(featureKey, user, default))
 
@@ -65,5 +69,10 @@ object LaunchDarklyClient {
     override def jsonVariation(featureKey: String, user: LDUser, default: LDValue): F[LDValue] =
       unsafeWithJavaClient(_.jsonValueVariation(featureKey, user, default))
 
+    override def mapK[G[_]](fk: F ~> G): LaunchDarklyClient[G] = new LaunchDarklyClient.Default[G] {
+      override def unsafeWithJavaClient[A](f: LDClient => A): G[A] = fk(
+        self.unsafeWithJavaClient(f)
+      )
+    }
   }
 }
