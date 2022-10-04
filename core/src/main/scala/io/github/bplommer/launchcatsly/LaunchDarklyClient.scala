@@ -22,7 +22,6 @@ import com.launchdarkly.sdk.server.{LDClient, LDConfig}
 import com.launchdarkly.sdk.{LDUser, LDValue}
 
 trait LaunchDarklyClient[F[_]] { self =>
-  def unsafeWithJavaClient[A](f: LDClient => A): F[A]
 
   def boolVariation(featureKey: String, user: LDUser, defaultValue: Boolean): F[Boolean]
 
@@ -41,8 +40,7 @@ object LaunchDarklyClient {
   def resource[F[_]](sdkKey: String, config: LDConfig)(implicit
       F: Sync[F]
   ): Resource[F, LaunchDarklyClient[F]] =
-    Resource
-      .make(F.blocking(new LDClient(sdkKey, config)))(cl => F.blocking(cl.close()))
+    Resource.fromAutoCloseable(F.blocking(new LDClient(sdkKey, config)))
       .map { ldClient =>
         new LaunchDarklyClient.Default[F] {
 
@@ -54,6 +52,8 @@ object LaunchDarklyClient {
 
   trait Default[F[_]] extends LaunchDarklyClient[F] {
     self =>
+    protected def unsafeWithJavaClient[A](f: LDClient => A): F[A]
+
     override def boolVariation(featureKey: String, user: LDUser, default: Boolean): F[Boolean] =
       unsafeWithJavaClient(_.boolVariation(featureKey, user, default))
 
