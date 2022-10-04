@@ -33,9 +33,11 @@ trait LaunchDarklyClient[F[_]] {
 
   def doubleVariation(featureKey: String, user: LDUser, defaultValue: Double): F[Double]
 
+  def jsonVariation(featureKey: String, user: LDUser, defaultValue: LDValue): F[LDValue]
+
   def listen(featureKey: String, user: LDUser): Stream[F, FlagValueChangeEvent]
 
-  def jsonVariation(featureKey: String, user: LDUser, defaultValue: LDValue): F[LDValue]
+  def flush: F[Unit]
 
   def mapK[G[_]](fk: F ~> G): LaunchDarklyClient[G]
 }
@@ -57,12 +59,8 @@ object LaunchDarklyClient {
               Stream.resource(Dispatcher[F]).flatMap { dispatcher =>
                 Stream.eval(Queue.unbounded[F, FlagValueChangeEvent]).flatMap { q =>
                   val listener = new FlagValueChangeListener {
-                    override def onFlagValueChange(event: FlagValueChangeEvent): Unit = {
-                      println(
-                        s"Flag change event: ${event.getKey}: ${event.getOldValue.toString} -> ${event.getNewValue.toString}"
-                      )
+                    override def onFlagValueChange(event: FlagValueChangeEvent): Unit =
                       dispatcher.unsafeRunSync(q.offer(event))
-                    }
                   }
 
                   Stream.bracket(
@@ -94,6 +92,8 @@ object LaunchDarklyClient {
     override def jsonVariation(featureKey: String, user: LDUser, default: LDValue): F[LDValue] =
       unsafeWithJavaClient(_.jsonValueVariation(featureKey, user, default))
 
+    override def flush: F[Unit] = unsafeWithJavaClient(_.flush())
+
     override def mapK[G[_]](fk: F ~> G): LaunchDarklyClient[G] = new LaunchDarklyClient.Default[G] {
       override def unsafeWithJavaClient[A](f: LDClient => A): G[A] = fk(
         self.unsafeWithJavaClient(f)
@@ -101,6 +101,8 @@ object LaunchDarklyClient {
 
       override def listen(featureKey: String, user: LDUser): Stream[G, FlagValueChangeEvent] =
         self.listen(featureKey, user).translate(fk)
+
+      override def flush: G[Unit] = fk(self.flush)
     }
   }
 }

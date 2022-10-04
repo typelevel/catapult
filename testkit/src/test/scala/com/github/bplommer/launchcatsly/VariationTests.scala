@@ -16,7 +16,7 @@
 
 package com.github.bplommer.launchcatsly
 
-import cats.data.Chain
+import cats.data.{Chain, NonEmptyChain}
 import cats.effect._
 import cats.effect.std.Supervisor
 import com.launchdarkly.sdk.server.interfaces.FlagValueChangeEvent
@@ -57,16 +57,23 @@ object VariationTests extends SimpleIOSuite {
               .compile
               .drain
           )
-          _ <- IO.sleep(5000.millis)
+          _ <- IO.sleep(500.millis)
           _ <- setFooFlag("value1")
           _ <- setFooFlag("value2")
-          _ <- IO.sleep(5000.millis)
+          _ <- client.flush
+          _ <- IO.sleep(1000.millis)
           result <- received.get
-        } yield expect(
-          result.map(event =>
-            (event.getOldValue.stringValue(), event.getNewValue.stringValue())
-          ) == Chain((null, "value1"), ("value1", "value2"))
-        )
+          unchained = NonEmptyChain
+            .fromChain(
+              result.map(event =>
+                (event.getOldValue.stringValue(), event.getNewValue.stringValue())
+              )
+            )
+            .map(_.reduceLeft { case ((old1, new1), (old2, new2)) =>
+              if (old2 == new1) (old1, new2) else throw new Exception("")
+            })
+
+        } yield expect(unchained == Some((null, "value2")))
       }
     }
   )
