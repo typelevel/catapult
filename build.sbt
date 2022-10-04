@@ -1,5 +1,5 @@
 // https://typelevel.org/sbt-typelevel/faq.html#what-is-a-base-version-anyway
-ThisBuild / tlBaseVersion := "0.0" // your current series x.y
+ThisBuild / tlBaseVersion := "0.1" // your current series x.y
 
 ThisBuild / organization := "io.github.bplommer"
 ThisBuild / organizationName := "Ben Plommer"
@@ -31,6 +31,7 @@ lazy val testkit = crossProject(JVMPlatform)
       "com.disneystreaming" %% "weaver-cats" % "0.7.12" % Test
     ),
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
+    tlVersionIntroduced := List("2.13", "3").map(_ -> "0.1.0").toMap,
   )
   .dependsOn(core)
 
