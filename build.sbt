@@ -32,8 +32,8 @@ lazy val core = crossProject(JVMPlatform)
       "org.typelevel" %%% "cats-effect" % "3.3.14",
       "com.launchdarkly" % "launchdarkly-java-server-sdk" % "5.10.2",
       "org.scalameta" %%% "munit" % "0.7.29" % Test,
-      "org.typelevel" %%% "munit-cats-effect-3" % "1.0.7" % Test
-    )
+      "org.typelevel" %%% "munit-cats-effect-3" % "1.0.7" % Test,
+    ),
   )
 
 lazy val docs = project.in(file("site")).enablePlugins(TypelevelSitePlugin)
