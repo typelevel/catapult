@@ -52,7 +52,7 @@ object LaunchDarklyClient {
         new LaunchDarklyClient.Default[F] {
 
           override def unsafeWithJavaClient[A](f: LDClient => A): F[A] =
-            F.delay(f(ldClient))
+            F.blocking(f(ldClient))
 
           override def listen(featureKey: String, user: LDUser): Stream[F, FlagValueChangeEvent] =
             Stream.eval(F.delay(ldClient.getFlagTracker)).flatMap { tracker =>
