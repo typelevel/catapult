@@ -16,7 +16,7 @@
       {
         devShell = pkgs.devshell.mkShell {
           imports = [ typelevel-nix.typelevelShell ];
-          name = "launch-catsly-shell";
+          name = "catapult-shell";
           typelevelShell = {
             jdk.package = pkgs.jdk8;
             nodejs.enable = true;

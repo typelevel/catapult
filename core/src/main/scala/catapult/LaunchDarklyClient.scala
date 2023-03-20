@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.github.bplommer.launchcatsly
+package catapult
 
 import cats.effect.std.{Dispatcher, Queue}
 import cats.effect.{Async, Resource}

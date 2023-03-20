@@ -26,7 +26,7 @@ lazy val testkit = crossProject(JVMPlatform)
   .crossType(CrossType.Pure)
   .in(file("testkit"))
   .settings(
-    name := "launch-catsly-testkit",
+    name := "catapult-testkit",
     libraryDependencies ++= Seq(
       "com.disneystreaming" %% "weaver-cats" % "0.7.12" % Test
     ),
@@ -39,7 +39,7 @@ lazy val core = crossProject(JVMPlatform)
   .crossType(CrossType.Pure)
   .in(file("core"))
   .settings(
-    name := "launch-catsly",
+    name := "catapult",
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-core" % "2.8.0",
       "org.typelevel" %%% "cats-effect" % "3.3.14",

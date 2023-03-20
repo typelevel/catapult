@@ -1,4 +1,4 @@
-## launch-catsly
+## catapult
 
 ### Usage
 
@@ -8,6 +8,6 @@ To use the latest version, include the following in your `build.sbt`:
 
 ```scala
 libraryDependencies ++= Seq(
-  "io.github.bplommer" %% "launch-catsly" % "@VERSION@"
+  "io.github.bplommer" %% "catapult" % "@VERSION@"
 )
 ```
