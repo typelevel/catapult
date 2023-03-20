@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.github.bplommer.launchcatsly
+package catapult
 
 import cats.effect.{Async, Resource}
 import cats.syntax.all._
