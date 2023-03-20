@@ -1,5 +1,5 @@
 // https://typelevel.org/sbt-typelevel/faq.html#what-is-a-base-version-anyway
-ThisBuild / tlBaseVersion := "0.1" // your current series x.y
+ThisBuild / tlBaseVersion := "0.2" // your current series x.y
 
 ThisBuild / organization := "io.github.bplommer"
 ThisBuild / organizationName := "Ben Plommer"
@@ -44,7 +44,7 @@ lazy val core = crossProject(JVMPlatform)
       "org.typelevel" %%% "cats-core" % "2.8.0",
       "org.typelevel" %%% "cats-effect" % "3.3.14",
       "co.fs2" %%% "fs2-core" % "3.3.0",
-      "com.launchdarkly" % "launchdarkly-java-server-sdk" % "5.10.3",
+      "com.launchdarkly" % "launchdarkly-java-server-sdk" % "6.0.5",
     ),
   )
 
