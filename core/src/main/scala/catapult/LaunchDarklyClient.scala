@@ -21,21 +21,38 @@ import cats.effect.{Async, Resource}
 import cats.~>
 import com.launchdarkly.sdk.server.interfaces.{FlagValueChangeEvent, FlagValueChangeListener}
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
-import com.launchdarkly.sdk.{LDUser, LDValue}
+import com.launchdarkly.sdk.{LDContext, LDUser, LDValue}
 import fs2._
 
 trait LaunchDarklyClient[F[_]] {
-  def boolVariation(featureKey: String, user: LDUser, defaultValue: Boolean): F[Boolean]
 
-  def stringVariation(featureKey: String, user: LDUser, defaultValue: String): F[String]
+  def boolVariation(featureKey: String, context: LDContext, defaultValue: Boolean): F[Boolean]
 
-  def intVariation(featureKey: String, user: LDUser, defaultValue: Int): F[Int]
+  final def boolVariation(featureKey: String, user: LDUser, defaultValue: Boolean): F[Boolean] =
+    boolVariation(featureKey, LDContext.fromUser(user), defaultValue)
 
-  def doubleVariation(featureKey: String, user: LDUser, defaultValue: Double): F[Double]
+  def stringVariation(featureKey: String, context: LDContext, defaultValue: String): F[String]
 
-  def jsonVariation(featureKey: String, user: LDUser, defaultValue: LDValue): F[LDValue]
+  final def stringVariation(featureKey: String, user: LDUser, defaultValue: String): F[String] =
+    stringVariation(featureKey, LDContext.fromUser(user), defaultValue)
+  def intVariation(featureKey: String, context: LDContext, defaultValue: Int): F[Int]
 
-  def listen(featureKey: String, user: LDUser): Stream[F, FlagValueChangeEvent]
+  final def intVariation(featureKey: String, user: LDUser, defaultValue: Int): F[Int] =
+    intVariation(featureKey, LDContext.fromUser(user), defaultValue)
+  def doubleVariation(featureKey: String, context: LDContext, defaultValue: Double): F[Double]
+
+  final def doubleVariation(featureKey: String, user: LDUser, defaultValue: Double): F[Double] =
+    doubleVariation(featureKey, LDContext.fromUser(user), defaultValue)
+
+  def jsonVariation(featureKey: String, context: LDContext, defaultValue: LDValue): F[LDValue]
+
+  final def jsonVariation(featureKey: String, user: LDUser, defaultValue: LDValue): F[LDValue] =
+    jsonVariation(featureKey, LDContext.fromUser(user), defaultValue)
+
+  def listen(featureKey: String, context: LDContext): Stream[F, FlagValueChangeEvent]
+
+  final def listen(featureKey: String, user: LDUser): Stream[F, FlagValueChangeEvent] =
+    listen(featureKey, LDContext.fromUser(user))
 
   def flush: F[Unit]
 
@@ -54,7 +71,10 @@ object LaunchDarklyClient {
           override def unsafeWithJavaClient[A](f: LDClient => A): F[A] =
             F.blocking(f(ldClient))
 
-          override def listen(featureKey: String, user: LDUser): Stream[F, FlagValueChangeEvent] =
+          override def listen(
+              featureKey: String,
+              context: LDContext,
+          ): Stream[F, FlagValueChangeEvent] =
             Stream.eval(F.delay(ldClient.getFlagTracker)).flatMap { tracker =>
               Stream.resource(Dispatcher[F]).flatMap { dispatcher =>
                 Stream.eval(Queue.unbounded[F, FlagValueChangeEvent]).flatMap { q =>
@@ -64,7 +84,7 @@ object LaunchDarklyClient {
                   }
 
                   Stream.bracket(
-                    F.delay(tracker.addFlagValueChangeListener(featureKey, user, listener))
+                    F.delay(tracker.addFlagValueChangeListener(featureKey, context, listener))
                   )(listener => F.delay(tracker.removeFlagChangeListener(listener))) >>
                     Stream.fromQueueUnterminated(q)
                 }
@@ -77,20 +97,36 @@ object LaunchDarklyClient {
     self =>
     protected def unsafeWithJavaClient[A](f: LDClient => A): F[A]
 
-    override def boolVariation(featureKey: String, user: LDUser, default: Boolean): F[Boolean] =
-      unsafeWithJavaClient(_.boolVariation(featureKey, user, default))
+    override def boolVariation(
+        featureKey: String,
+        context: LDContext,
+        default: Boolean,
+    ): F[Boolean] =
+      unsafeWithJavaClient(_.boolVariation(featureKey, context, default))
 
-    override def stringVariation(featureKey: String, user: LDUser, default: String): F[String] =
-      unsafeWithJavaClient(_.stringVariation(featureKey, user, default))
+    override def stringVariation(
+        featureKey: String,
+        context: LDContext,
+        default: String,
+    ): F[String] =
+      unsafeWithJavaClient(_.stringVariation(featureKey, context, default))
 
-    override def intVariation(featureKey: String, user: LDUser, default: Int): F[Int] =
-      unsafeWithJavaClient(_.intVariation(featureKey, user, default))
+    override def intVariation(featureKey: String, context: LDContext, default: Int): F[Int] =
+      unsafeWithJavaClient(_.intVariation(featureKey, context, default))
 
-    override def doubleVariation(featureKey: String, user: LDUser, default: Double): F[Double] =
-      unsafeWithJavaClient(_.doubleVariation(featureKey, user, default))
+    override def doubleVariation(
+        featureKey: String,
+        context: LDContext,
+        default: Double,
+    ): F[Double] =
+      unsafeWithJavaClient(_.doubleVariation(featureKey, context, default))
 
-    override def jsonVariation(featureKey: String, user: LDUser, default: LDValue): F[LDValue] =
-      unsafeWithJavaClient(_.jsonValueVariation(featureKey, user, default))
+    override def jsonVariation(
+        featureKey: String,
+        context: LDContext,
+        default: LDValue,
+    ): F[LDValue] =
+      unsafeWithJavaClient(_.jsonValueVariation(featureKey, context, default))
 
     override def flush: F[Unit] = unsafeWithJavaClient(_.flush())
 
@@ -99,8 +135,8 @@ object LaunchDarklyClient {
         self.unsafeWithJavaClient(f)
       )
 
-      override def listen(featureKey: String, user: LDUser): Stream[G, FlagValueChangeEvent] =
-        self.listen(featureKey, user).translate(fk)
+      override def listen(featureKey: String, context: LDContext): Stream[G, FlagValueChangeEvent] =
+        self.listen(featureKey, context).translate(fk)
 
       override def flush: G[Unit] = fk(self.flush)
     }
