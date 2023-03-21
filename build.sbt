@@ -16,8 +16,8 @@ ThisBuild / tlSonatypeUseLegacyHost := false
 // publish website from this branch
 ThisBuild / tlSitePublishBranch := Some("main")
 
-val Scala213 = "2.13.8"
-ThisBuild / crossScalaVersions := Seq(Scala213, "3.1.1")
+val Scala213 = "2.13.10"
+ThisBuild / crossScalaVersions := Seq(Scala213, "3.2.2")
 ThisBuild / scalaVersion := Scala213 // the default Scala
 
 lazy val root = tlCrossRootProject.aggregate(core, testkit)
@@ -28,7 +28,7 @@ lazy val testkit = crossProject(JVMPlatform)
   .settings(
     name := "catapult-testkit",
     libraryDependencies ++= Seq(
-      "com.disneystreaming" %% "weaver-cats" % "0.7.12" % Test
+      "com.disneystreaming" %% "weaver-cats" % "0.8.1" % Test
     ),
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
     tlVersionIntroduced := List("2.13", "3").map(_ -> "0.1.0").toMap,
@@ -41,10 +41,10 @@ lazy val core = crossProject(JVMPlatform)
   .settings(
     name := "catapult",
     libraryDependencies ++= Seq(
-      "org.typelevel" %%% "cats-core" % "2.8.0",
-      "org.typelevel" %%% "cats-effect" % "3.3.14",
-      "co.fs2" %%% "fs2-core" % "3.3.0",
-      "com.launchdarkly" % "launchdarkly-java-server-sdk" % "6.0.5",
+      "org.typelevel" %%% "cats-core" % "2.9.0",
+      "org.typelevel" %%% "cats-effect" % "3.4.8",
+      "co.fs2" %%% "fs2-core" % "3.6.1",
+      "com.launchdarkly" % "launchdarkly-java-server-sdk" % "6.0.6",
     ),
   )
 
