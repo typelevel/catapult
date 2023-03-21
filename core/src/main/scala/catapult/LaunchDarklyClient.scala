@@ -35,10 +35,12 @@ trait LaunchDarklyClient[F[_]] {
 
   final def stringVariation(featureKey: String, user: LDUser, defaultValue: String): F[String] =
     stringVariation(featureKey, LDContext.fromUser(user), defaultValue)
+
   def intVariation(featureKey: String, context: LDContext, defaultValue: Int): F[Int]
 
   final def intVariation(featureKey: String, user: LDUser, defaultValue: Int): F[Int] =
     intVariation(featureKey, LDContext.fromUser(user), defaultValue)
+
   def doubleVariation(featureKey: String, context: LDContext, defaultValue: Double): F[Double]
 
   final def doubleVariation(featureKey: String, user: LDUser, defaultValue: Double): F[Double] =
@@ -76,7 +78,7 @@ object LaunchDarklyClient {
               context: LDContext,
           ): Stream[F, FlagValueChangeEvent] =
             Stream.eval(F.delay(ldClient.getFlagTracker)).flatMap { tracker =>
-              Stream.resource(Dispatcher[F]).flatMap { dispatcher =>
+              Stream.resource(Dispatcher.sequential[F]).flatMap { dispatcher =>
                 Stream.eval(Queue.unbounded[F, FlagValueChangeEvent]).flatMap { q =>
                   val listener = new FlagValueChangeListener {
                     override def onFlagValueChange(event: FlagValueChangeEvent): Unit =
