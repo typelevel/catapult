@@ -26,34 +26,77 @@ import fs2._
 
 trait LaunchDarklyClient[F[_]] {
 
+  /** @param featureKey the key of the flag to be evaluated
+    * @param context the context against which the flag is being evaluated
+    * @param defaultValue the value to use if evaluation fails for any reason
+    * @tparam Ctx the type representing the context; this can be [[com.launchdarkly.sdk.LDContext]], [[com.launchdarkly.sdk.LDUser]], or any type with a [[ContextEncoder]] instance in scope.
+    * @return the flag value, suspended in the [[F]] effect. If evaluation fails for any reason, or the evaluated value is not of type Boolean, returns the default value.
+    * @see [[com.launchdarkly.sdk.server.interfaces.LDClientInterface#boolVariation]]
+    */
   def boolVariation[Ctx: ContextEncoder](
       featureKey: String,
       context: Ctx,
       defaultValue: Boolean,
   ): F[Boolean]
 
+  /** @param featureKey   the key of the flag to be evaluated
+    * @param context      the context against which the flag is being evaluated
+    * @param defaultValue the value to use if evaluation fails for any reason
+    * @tparam Ctx the type representing the context; this can be [[com.launchdarkly.sdk.LDContext]], [[com.launchdarkly.sdk.LDUser]], or any type with a [[ContextEncoder]] instance in scope.
+    * @return the flag value, suspended in the [[F]] effect. If evaluation fails for any reason, or the evaluated value is not of type String, returns the default value.
+    * @see [[com.launchdarkly.sdk.server.interfaces.LDClientInterface#stringVariation]]
+    */
   def stringVariation[Ctx: ContextEncoder](
       featureKey: String,
       context: Ctx,
       defaultValue: String,
   ): F[String]
 
+  /** @param featureKey   the key of the flag to be evaluated
+    * @param context      the context against which the flag is being evaluated
+    * @param defaultValue the value to use if evaluation fails for any reason
+    * @tparam Ctx the type representing the context; this can be [[com.launchdarkly.sdk.LDContext]], [[com.launchdarkly.sdk.LDUser]], or any type with a [[ContextEncoder]] instance in scope.
+    * @return the flag value, suspended in the [[F]] effect. If evaluation fails for any reason, or the evaluated value cannot be represented as type Int, returns the default value.
+    * @see [[com.launchdarkly.sdk.server.interfaces.LDClientInterface#intVariation]]
+    */
   def intVariation[Ctx: ContextEncoder](featureKey: String, context: Ctx, defaultValue: Int): F[Int]
 
+  /** @param featureKey   the key of the flag to be evaluated
+    * @param context      the context against which the flag is being evaluated
+    * @param defaultValue the value to use if evaluation fails for any reason
+    * @tparam Ctx the type representing the context; this can be [[com.launchdarkly.sdk.LDContext]], [[com.launchdarkly.sdk.LDUser]], or any type with a [[ContextEncoder]] instance in scope.
+    * @return the flag value, suspended in the [[F]] effect. If evaluation fails for any reason, or the evaluated value cannot be represented as type Double, returns the default value.
+    * @see [[com.launchdarkly.sdk.server.interfaces.LDClientInterface#doubleVariation]]
+    */
   def doubleVariation[Ctx: ContextEncoder](
       featureKey: String,
       context: Ctx,
       defaultValue: Double,
   ): F[Double]
 
+  /** @param featureKey   the key of the flag to be evaluated
+    * @param context      the context against which the flag is being evaluated
+    * @param defaultValue the value to use if evaluation fails for any reason
+    * @tparam Ctx the type representing the context; this can be [[com.launchdarkly.sdk.LDContext]], [[com.launchdarkly.sdk.LDUser]], or any type with a [[ContextEncoder]] instance in scope.
+    * @return the flag value, suspended in the [[F]] effect. If evaluation fails for any reason, returns the default value.
+    * @see [[com.launchdarkly.sdk.server.interfaces.LDClientInterface#jsonValueVariation]]
+    */
   def jsonVariation[Ctx: ContextEncoder](
       featureKey: String,
       context: Ctx,
       defaultValue: LDValue,
   ): F[LDValue]
 
+  /** @param featureKey   the key of the flag to be evaluated
+    * @param context      the context against which the flag is being evaluated
+    * @tparam Ctx the type representing the context; this can be [[com.launchdarkly.sdk.LDContext]], [[com.launchdarkly.sdk.LDUser]], or any type with a [[ContextEncoder]] instance in scope.
+    * @return A [[Stream]] of [[FlagValueChangeEvent]] instances representing changes to the value of the flag in the provided context. Note: if the flag value changes multiple times in quick succession, some intermediate values may be missed; for example, a change from `1` to `2` to `3` may be represented only as a change from `1` to `3`
+    * @see [[com.launchdarkly.sdk.server.interfaces.FlagTracker]]
+    */
   def listen[Ctx: ContextEncoder](featureKey: String, context: Ctx): Stream[F, FlagValueChangeEvent]
 
+  /** @see [[com.launchdarkly.sdk.server.interfaces.LDClientInterface#flush]]
+    */
   def flush: F[Unit]
 
   def mapK[G[_]](fk: F ~> G): LaunchDarklyClient[G]
