@@ -21,40 +21,38 @@ import cats.effect.{Async, Resource}
 import cats.~>
 import com.launchdarkly.sdk.server.interfaces.{FlagValueChangeEvent, FlagValueChangeListener}
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
-import com.launchdarkly.sdk.{LDContext, LDUser, LDValue}
+import com.launchdarkly.sdk.LDValue
 import fs2._
 
 trait LaunchDarklyClient[F[_]] {
 
-  def boolVariation(featureKey: String, context: LDContext, defaultValue: Boolean): F[Boolean]
+  def boolVariation[Ctx: ContextEncoder](
+      featureKey: String,
+      context: Ctx,
+      defaultValue: Boolean,
+  ): F[Boolean]
 
-  final def boolVariation(featureKey: String, user: LDUser, defaultValue: Boolean): F[Boolean] =
-    boolVariation(featureKey, LDContext.fromUser(user), defaultValue)
+  def stringVariation[Ctx: ContextEncoder](
+      featureKey: String,
+      context: Ctx,
+      defaultValue: String,
+  ): F[String]
 
-  def stringVariation(featureKey: String, context: LDContext, defaultValue: String): F[String]
+  def intVariation[Ctx: ContextEncoder](featureKey: String, context: Ctx, defaultValue: Int): F[Int]
 
-  final def stringVariation(featureKey: String, user: LDUser, defaultValue: String): F[String] =
-    stringVariation(featureKey, LDContext.fromUser(user), defaultValue)
+  def doubleVariation[Ctx: ContextEncoder](
+      featureKey: String,
+      context: Ctx,
+      defaultValue: Double,
+  ): F[Double]
 
-  def intVariation(featureKey: String, context: LDContext, defaultValue: Int): F[Int]
+  def jsonVariation[Ctx: ContextEncoder](
+      featureKey: String,
+      context: Ctx,
+      defaultValue: LDValue,
+  ): F[LDValue]
 
-  final def intVariation(featureKey: String, user: LDUser, defaultValue: Int): F[Int] =
-    intVariation(featureKey, LDContext.fromUser(user), defaultValue)
-
-  def doubleVariation(featureKey: String, context: LDContext, defaultValue: Double): F[Double]
-
-  final def doubleVariation(featureKey: String, user: LDUser, defaultValue: Double): F[Double] =
-    doubleVariation(featureKey, LDContext.fromUser(user), defaultValue)
-
-  def jsonVariation(featureKey: String, context: LDContext, defaultValue: LDValue): F[LDValue]
-
-  final def jsonVariation(featureKey: String, user: LDUser, defaultValue: LDValue): F[LDValue] =
-    jsonVariation(featureKey, LDContext.fromUser(user), defaultValue)
-
-  def listen(featureKey: String, context: LDContext): Stream[F, FlagValueChangeEvent]
-
-  final def listen(featureKey: String, user: LDUser): Stream[F, FlagValueChangeEvent] =
-    listen(featureKey, LDContext.fromUser(user))
+  def listen[Ctx: ContextEncoder](featureKey: String, context: Ctx): Stream[F, FlagValueChangeEvent]
 
   def flush: F[Unit]
 
@@ -73,10 +71,10 @@ object LaunchDarklyClient {
           override def unsafeWithJavaClient[A](f: LDClient => A): F[A] =
             F.blocking(f(ldClient))
 
-          override def listen(
+          override def listen[Ctx](
               featureKey: String,
-              context: LDContext,
-          ): Stream[F, FlagValueChangeEvent] =
+              context: Ctx,
+          )(implicit ctxEncoder: ContextEncoder[Ctx]): Stream[F, FlagValueChangeEvent] =
             Stream.eval(F.delay(ldClient.getFlagTracker)).flatMap { tracker =>
               Stream.resource(Dispatcher.sequential[F]).flatMap { dispatcher =>
                 Stream.eval(Queue.unbounded[F, FlagValueChangeEvent]).flatMap { q =>
@@ -86,7 +84,13 @@ object LaunchDarklyClient {
                   }
 
                   Stream.bracket(
-                    F.delay(tracker.addFlagValueChangeListener(featureKey, context, listener))
+                    F.delay(
+                      tracker.addFlagValueChangeListener(
+                        featureKey,
+                        ctxEncoder.encode(context),
+                        listener,
+                      )
+                    )
                   )(listener => F.delay(tracker.removeFlagChangeListener(listener))) >>
                     Stream.fromQueueUnterminated(q)
                 }
@@ -99,36 +103,38 @@ object LaunchDarklyClient {
     self =>
     protected def unsafeWithJavaClient[A](f: LDClient => A): F[A]
 
-    override def boolVariation(
+    override def boolVariation[Ctx](
         featureKey: String,
-        context: LDContext,
+        context: Ctx,
         default: Boolean,
-    ): F[Boolean] =
-      unsafeWithJavaClient(_.boolVariation(featureKey, context, default))
+    )(implicit ctxEncoder: ContextEncoder[Ctx]): F[Boolean] =
+      unsafeWithJavaClient(_.boolVariation(featureKey, ctxEncoder.encode(context), default))
 
-    override def stringVariation(
+    override def stringVariation[Ctx](
         featureKey: String,
-        context: LDContext,
+        context: Ctx,
         default: String,
-    ): F[String] =
-      unsafeWithJavaClient(_.stringVariation(featureKey, context, default))
+    )(implicit ctxEncoder: ContextEncoder[Ctx]): F[String] =
+      unsafeWithJavaClient(_.stringVariation(featureKey, ctxEncoder.encode(context), default))
 
-    override def intVariation(featureKey: String, context: LDContext, default: Int): F[Int] =
-      unsafeWithJavaClient(_.intVariation(featureKey, context, default))
+    override def intVariation[Ctx](featureKey: String, context: Ctx, default: Int)(implicit
+        ctxEncoder: ContextEncoder[Ctx]
+    ): F[Int] =
+      unsafeWithJavaClient(_.intVariation(featureKey, ctxEncoder.encode(context), default))
 
-    override def doubleVariation(
+    override def doubleVariation[Ctx](
         featureKey: String,
-        context: LDContext,
+        context: Ctx,
         default: Double,
-    ): F[Double] =
-      unsafeWithJavaClient(_.doubleVariation(featureKey, context, default))
+    )(implicit ctxEncoder: ContextEncoder[Ctx]): F[Double] =
+      unsafeWithJavaClient(_.doubleVariation(featureKey, ctxEncoder.encode(context), default))
 
-    override def jsonVariation(
+    override def jsonVariation[Ctx](
         featureKey: String,
-        context: LDContext,
+        context: Ctx,
         default: LDValue,
-    ): F[LDValue] =
-      unsafeWithJavaClient(_.jsonValueVariation(featureKey, context, default))
+    )(implicit ctxEncoder: ContextEncoder[Ctx]): F[LDValue] =
+      unsafeWithJavaClient(_.jsonValueVariation(featureKey, ctxEncoder.encode(context), default))
 
     override def flush: F[Unit] = unsafeWithJavaClient(_.flush())
 
@@ -137,7 +143,9 @@ object LaunchDarklyClient {
         self.unsafeWithJavaClient(f)
       )
 
-      override def listen(featureKey: String, context: LDContext): Stream[G, FlagValueChangeEvent] =
+      override def listen[Ctx](featureKey: String, context: Ctx)(implicit
+          ctxEncoder: ContextEncoder[Ctx]
+      ): Stream[G, FlagValueChangeEvent] =
         self.listen(featureKey, context).translate(fk)
 
       override def flush: G[Unit] = fk(self.flush)
