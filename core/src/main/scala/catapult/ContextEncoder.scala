@@ -27,7 +27,7 @@ trait ContextEncoder[Ctx] {
 }
 
 object ContextEncoder {
-  implicit val catapultContextEncoderForLdContext: ContextEncoder[LDContext] = identity
+  implicit val catapultContextEncoderForLdContext: ContextEncoder[LDContext] = identity(_)
 
-  implicit val catapultContextEncoderForLdUser: ContextEncoder[LDUser] = LDContext.fromUser
+  implicit val catapultContextEncoderForLdUser: ContextEncoder[LDUser] = LDContext.fromUser(_)
 }
