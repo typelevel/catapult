@@ -18,9 +18,9 @@ package catapult
 
 import com.launchdarkly.sdk.{LDContext, LDUser}
 
-/** A typeclass for converting values of type [[Ctx]] into [[LDContext]]. An instance must be in scope when
-  * evaulating flags against a context represented by the [[Ctx]] type. Instances are provided for [[LDContext]]
-  * and [[LDUser]]; custom instances can be created to allow other types to be used.
+/** A typeclass for converting values of type `Ctx` into [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/LDContext.html LDContext]]. An instance must be in scope when
+  * evaulating flags against a context represented by the `Ctx` type. Instances are provided for [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/LDContext.html LDContext]]
+  * and [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/LDUser.html LDUser]]; custom instances can be created to allow other types to be used.
   */
 trait ContextEncoder[Ctx] {
   def encode(ctx: Ctx): LDContext
