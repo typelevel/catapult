@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package catapult
+package org.typelevel.catapult
 
 import com.launchdarkly.sdk.{LDContext, LDUser}
 

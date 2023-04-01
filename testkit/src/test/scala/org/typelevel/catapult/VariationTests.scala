@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package catapult
+package org.typelevel.catapult
 
 import cats.data.{Chain, NonEmptyChain}
 import cats.effect._
 import cats.effect.std.Supervisor
 import com.launchdarkly.sdk.server.interfaces.FlagValueChangeEvent
 import com.launchdarkly.sdk.{LDUser, LDValue}
-import catapult.testkit._
+import org.typelevel.catapult.testkit._
 import weaver.SimpleIOSuite
 
 import scala.concurrent.duration.DurationInt

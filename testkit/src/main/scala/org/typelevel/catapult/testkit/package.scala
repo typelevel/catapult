@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package catapult
+package org.typelevel.catapult
 
 import cats.effect.{Async, Resource}
 import cats.syntax.all._
