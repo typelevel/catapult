@@ -1,13 +1,14 @@
 // https://typelevel.org/sbt-typelevel/faq.html#what-is-a-base-version-anyway
 ThisBuild / tlBaseVersion := "0.4" // your current series x.y
 
-ThisBuild / organization := "io.github.bplommer"
-ThisBuild / organizationName := "Ben Plommer"
+ThisBuild / organization := "org.typelevel"
+ThisBuild / organizationName := "Typelevel"
 ThisBuild / startYear := Some(2022)
 ThisBuild / licenses := Seq(License.Apache2)
 ThisBuild / developers := List(
   // your GitHub handle and name
-  tlGitHubDev("bplommer", "Ben Plommer")
+  tlGitHubDev("bplommer", "Ben Plommer"),
+  tlGitHubDev("averymcnab", "Avery McNab"),
 )
 
 // publish to s01.oss.sonatype.org (set to true to publish to oss.sonatype.org instead)
