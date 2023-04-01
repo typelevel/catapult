@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ben Plommer
+ * Copyright 2022 Typelevel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package catapult
+package org.typelevel.catapult
 
 import cats.data.{Chain, NonEmptyChain}
 import cats.effect._
 import cats.effect.std.Supervisor
 import com.launchdarkly.sdk.server.interfaces.FlagValueChangeEvent
 import com.launchdarkly.sdk.{LDUser, LDValue}
-import catapult.testkit._
+import org.typelevel.catapult.testkit._
 import weaver.SimpleIOSuite
 
 import scala.concurrent.duration.DurationInt
