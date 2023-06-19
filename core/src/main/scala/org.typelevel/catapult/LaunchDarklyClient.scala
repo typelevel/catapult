@@ -108,39 +108,47 @@ object LaunchDarklyClient {
   ): Resource[F, LaunchDarklyClient[F]] =
     Resource
       .fromAutoCloseable(F.blocking(new LDClient(sdkKey, config)))
-      .map { ldClient =>
-        new LaunchDarklyClient.Default[F] {
+      .map(ldClient => defaultLaunchDarklyClient(ldClient))
 
-          override def unsafeWithJavaClient[A](f: LDClient => A): F[A] =
-            F.blocking(f(ldClient))
+  def resource[F[_]](sdkKey: String)(implicit F: Async[F]): Resource[F, LaunchDarklyClient[F]] =
+    Resource
+      .fromAutoCloseable(F.blocking(new LDClient(sdkKey)))
+      .map(ldClient => defaultLaunchDarklyClient(ldClient))
 
-          override def listen[Ctx](
-              featureKey: String,
-              context: Ctx,
-          )(implicit ctxEncoder: ContextEncoder[Ctx]): Stream[F, FlagValueChangeEvent] =
-            Stream.eval(F.delay(ldClient.getFlagTracker)).flatMap { tracker =>
-              Stream.resource(Dispatcher.sequential[F]).flatMap { dispatcher =>
-                Stream.eval(Queue.unbounded[F, FlagValueChangeEvent]).flatMap { q =>
-                  val listener = new FlagValueChangeListener {
-                    override def onFlagValueChange(event: FlagValueChangeEvent): Unit =
-                      dispatcher.unsafeRunSync(q.offer(event))
-                  }
+  private def defaultLaunchDarklyClient[F[_]](
+      ldClient: LDClient
+  )(implicit F: Async[F]): LaunchDarklyClient.Default[F] =
+    new LaunchDarklyClient.Default[F] {
 
-                  Stream.bracket(
-                    F.delay(
-                      tracker.addFlagValueChangeListener(
-                        featureKey,
-                        ctxEncoder.encode(context),
-                        listener,
-                      )
-                    )
-                  )(listener => F.delay(tracker.removeFlagChangeListener(listener))) >>
-                    Stream.fromQueueUnterminated(q)
-                }
+      override def unsafeWithJavaClient[A](f: LDClient => A): F[A] =
+        F.blocking(f(ldClient))
+
+      override def listen[Ctx](
+          featureKey: String,
+          context: Ctx,
+      )(implicit ctxEncoder: ContextEncoder[Ctx]): Stream[F, FlagValueChangeEvent] =
+        Stream.eval(F.delay(ldClient.getFlagTracker)).flatMap { tracker =>
+          Stream.resource(Dispatcher.sequential[F]).flatMap { dispatcher =>
+            Stream.eval(Queue.unbounded[F, FlagValueChangeEvent]).flatMap { q =>
+              val listener = new FlagValueChangeListener {
+                override def onFlagValueChange(event: FlagValueChangeEvent): Unit =
+                  dispatcher.unsafeRunSync(q.offer(event))
               }
+
+              Stream.bracket(
+                F.delay(
+                  tracker.addFlagValueChangeListener(
+                    featureKey,
+                    ctxEncoder.encode(context),
+                    listener,
+                  )
+                )
+              )(listener => F.delay(tracker.removeFlagChangeListener(listener))) >>
+                Stream.fromQueueUnterminated(q)
             }
+          }
         }
-      }
+    }
 
   trait Default[F[_]] extends LaunchDarklyClient[F] {
     self =>
