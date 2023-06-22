@@ -17,7 +17,6 @@
 package org.typelevel.catapult
 
 import com.launchdarkly.sdk.{LDContext, LDUser}
-import cats.Contravariant
 
 /** A typeclass for converting values of type `Ctx` into [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/LDContext.html LDContext]]. An instance must be in scope when
   * evaulating flags against a context represented by the `Ctx` type. Instances are provided for [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/LDContext.html LDContext]]
@@ -25,20 +24,9 @@ import cats.Contravariant
   */
 trait ContextEncoder[Ctx] {
   def encode(ctx: Ctx): LDContext
-
-  /** Create a new `ContextEncoder` by applying a function to the input before encoding. */
-  def contramap[A](f: A => Ctx): ContextEncoder[A] = a => encode(f(a))
 }
 
 object ContextEncoder {
-  def apply[Ctx](implicit ev: ContextEncoder[Ctx]): ContextEncoder[Ctx] = ev
-  def encode[Ctx](ctx: Ctx)(implicit ev: ContextEncoder[Ctx]): LDContext = ev.encode(ctx)
-
-  implicit val catapultContextEncoderContravariant: Contravariant[ContextEncoder] =
-    new Contravariant[ContextEncoder] {
-      def contramap[A, B](fa: ContextEncoder[A])(f: B => A): ContextEncoder[B] = fa.contramap(f)
-    }
-
   implicit val catapultContextEncoderForLdContext: ContextEncoder[LDContext] = identity(_)
 
   implicit val catapultContextEncoderForLdUser: ContextEncoder[LDUser] = LDContext.fromUser(_)
