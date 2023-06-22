@@ -19,7 +19,7 @@ package org.typelevel.catapult
 import com.launchdarkly.sdk.{ContextKind, LDContext}
 import weaver.SimpleIOSuite
 
-case object ContextEncoderTests extends SimpleIOSuite {
+object ContextEncoderTests extends SimpleIOSuite {
   pureTest("contramap allows changing the input type of ContextEncoder") {
     // This is a trivial example - it would be just as simple to write a new ContextEncoder from scatch.
     case class Country(name: String)
@@ -28,9 +28,12 @@ case object ContextEncoderTests extends SimpleIOSuite {
       LDContext.builder(ContextKind.of("country"), country.name).build()
     )
 
+    val franceCtx = LDContext.create(ContextKind.of("country"), "France")
+    val germanyCtx = LDContext.create(ContextKind.of("country"), "Germany")
+
     expect.all(
-      enc.encode(Country("France")) == LDContext.create(ContextKind.of("country"), "France"),
-      enc.encode(Country("Germany")) == LDContext.create(ContextKind.of("country"), "Germany"),
+      enc.encode(Country("France")) == franceCtx,
+      enc.encode(Country("Germany")) == germanyCtx,
     )
   }
 }
