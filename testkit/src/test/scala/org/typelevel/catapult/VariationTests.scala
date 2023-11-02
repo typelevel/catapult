@@ -52,7 +52,7 @@ object VariationTests extends SimpleIOSuite {
           received <- IO.ref[Chain[FlagValueChangeEvent]](Chain.empty)
           _ <- sup.supervise(
             client
-              .listen("foo", new LDUser.Builder("derek").build())
+              .trackFlagValueChanges("foo", new LDUser.Builder("derek").build())
               .evalTap(event => received.update(_.append(event)))
               .compile
               .drain
