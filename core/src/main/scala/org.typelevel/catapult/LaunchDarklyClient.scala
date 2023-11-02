@@ -103,21 +103,29 @@ trait LaunchDarklyClient[F[_]] {
 }
 
 object LaunchDarklyClient {
+
+  /** @return a Catapult [[LaunchDarklyClient]] wrapped in [[cats.effect.Resource]], created using the given SDK key and config
+    */
   def resource[F[_]](sdkKey: String, config: LDConfig)(implicit
       F: Async[F]
   ): Resource[F, LaunchDarklyClient[F]] =
     Resource
       .fromAutoCloseable(F.blocking(new LDClient(sdkKey, config)))
-      .map(ldClient => defaultLaunchDarklyClient(ldClient))
+      .map(ldClient => unsafeFromJava(ldClient))
 
+  /** @return a Catapult [[LaunchDarklyClient]] wrapped in [[cats.effect.Resource]], created using the given SDK key and default config
+    */
   def resource[F[_]](sdkKey: String)(implicit F: Async[F]): Resource[F, LaunchDarklyClient[F]] =
     Resource
       .fromAutoCloseable(F.blocking(new LDClient(sdkKey)))
-      .map(ldClient => defaultLaunchDarklyClient(ldClient))
+      .map(ldClient => unsafeFromJava(ldClient))
 
-  private def defaultLaunchDarklyClient[F[_]](
+  /** @return a Catapult [[LaunchDarklyClient]] created using the provided `LDClient`.
+    *         It is the caller's responsibility to close the underlying `LDClient`.
+    */
+  def unsafeFromJava[F[_]](
       ldClient: LDClient
-  )(implicit F: Async[F]): LaunchDarklyClient.Default[F] =
+  )(implicit F: Async[F]): LaunchDarklyClient[F] =
     new LaunchDarklyClient.Default[F] {
 
       override def unsafeWithJavaClient[A](f: LDClient => A): F[A] =
