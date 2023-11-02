@@ -27,7 +27,12 @@ package object testkit {
       LaunchDarklyClient
         .resource(
           "fake-key",
-          new LDConfig.Builder().dataSource(td).events(Components.noEvents()).build,
+          new LDConfig.Builder()
+            .dataSource(td)
+            .events(
+              Components.noEvents() // prevent the client from attempting to send events to LD servers
+            )
+            .build,
         )
         .tupleLeft(td)
     }
