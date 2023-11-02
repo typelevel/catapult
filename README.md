@@ -35,7 +35,7 @@ A thin wrapper for the [Launch Darkly Java server SDK](https://github.com/launch
         _ <- IO.println(s"Double Variation: ${double}")
 
         // JSON Variant
-        json <- client.jsonVariation[LDUser]("JSON-FLAG", new LDUser("user-identifier"), defaultValue = LDValue.of("{}"))
+        json <- client.jsonValueVariation[LDUser]("JSON-FLAG", new LDUser("user-identifier"), defaultValue = LDValue.of("{}"))
         _ <- IO.println(s"JSON Variation: ${json}")
       } yield ()
     }

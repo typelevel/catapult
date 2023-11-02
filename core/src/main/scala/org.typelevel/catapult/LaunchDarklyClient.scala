@@ -81,11 +81,18 @@ trait LaunchDarklyClient[F[_]] {
     * @return the flag value, suspended in the `F` effect. If evaluation fails for any reason, returns the default value.
     * @see [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/server/interfaces/LDClientInterface.html#jsonValueVariation(java.lang.String,com.launchdarkly.sdk.LDContext,com.launchdarkly.sdk.LDValue) LDClientInterface#jsonValueVariation]]
     */
-  def jsonVariation[Ctx: ContextEncoder](
+  def jsonValueVariation[Ctx: ContextEncoder](
       featureKey: String,
       context: Ctx,
       defaultValue: LDValue,
   ): F[LDValue]
+
+  @deprecated("use jsonValueVariation", "5.0.0")
+  final def jsonVariation[Ctx: ContextEncoder](
+      featureKey: String,
+      context: Ctx,
+      defaultValue: LDValue,
+  ): F[LDValue] = jsonValueVariation(featureKey, context, defaultValue)
 
   /** @param featureKey   the key of the flag to be evaluated
     * @param context      the context against which the flag is being evaluated
@@ -180,7 +187,7 @@ object LaunchDarklyClient {
     )(implicit ctxEncoder: ContextEncoder[Ctx]): F[Double] =
       unsafeWithJavaClient(_.doubleVariation(featureKey, ctxEncoder.encode(context), default))
 
-    override def jsonVariation[Ctx](
+    override def jsonValueVariation[Ctx](
         featureKey: String,
         context: Ctx,
         default: LDValue,
