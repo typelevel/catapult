@@ -41,5 +41,6 @@ object ContextEncoder {
 
   implicit val catapultContextEncoderForLdContext: ContextEncoder[LDContext] = identity(_)
 
+  @deprecated("Use LDContext instead of LDUser", "0.5.0")
   implicit val catapultContextEncoderForLdUser: ContextEncoder[LDUser] = LDContext.fromUser(_)
 }
