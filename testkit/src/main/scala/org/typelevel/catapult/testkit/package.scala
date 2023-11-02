@@ -30,7 +30,7 @@ package object testkit {
           new LDConfig.Builder()
             .dataSource(td)
             .events(
-              Components.noEvents() // prevent the client from attempting to send events to LD servers
+              Components.noEvents() // prevent client from attempting to send events to LD servers
             )
             .build,
         )
