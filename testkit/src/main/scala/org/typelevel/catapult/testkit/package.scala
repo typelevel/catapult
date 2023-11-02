@@ -17,15 +17,18 @@
 package org.typelevel.catapult
 
 import cats.effect.{Async, Resource}
-import cats.syntax.all._
-import com.launchdarkly.sdk.server.LDConfig
+import cats.syntax.all.*
+import com.launchdarkly.sdk.server.{Components, LDConfig}
 import com.launchdarkly.sdk.server.integrations.TestData
 
 package object testkit {
   def testClient[F[_]](implicit F: Async[F]): Resource[F, (TestData, LaunchDarklyClient[F])] =
     Resource.eval(F.delay(TestData.dataSource())).flatMap { td =>
       LaunchDarklyClient
-        .resource("fake-key", new LDConfig.Builder().dataSource(td).build)
+        .resource(
+          "fake-key",
+          new LDConfig.Builder().dataSource(td).events(Components.noEvents()).build,
+        )
         .tupleLeft(td)
     }
 }
