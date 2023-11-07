@@ -150,7 +150,7 @@ object LaunchDarklyClient {
         }
     }
 
-  trait Default[F[_]] extends LaunchDarklyClient[F] {
+  private trait Default[F[_]] extends LaunchDarklyClient[F] {
     self =>
     protected def unsafeWithJavaClient[A](f: LDClient => A): F[A]
 
