@@ -43,7 +43,7 @@ lazy val core = crossProject(JVMPlatform)
     name := "catapult",
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-core" % "2.10.0",
-      "org.typelevel" %%% "cats-effect" % "3.5.2",
+      "org.typelevel" %%% "cats-effect" % "3.5.3",
       "co.fs2" %%% "fs2-core" % "3.9.2",
       "com.launchdarkly" % "launchdarkly-java-server-sdk" % "7.1.1",
     ),
