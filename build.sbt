@@ -18,7 +18,7 @@ ThisBuild / tlSonatypeUseLegacyHost := false
 ThisBuild / tlSitePublishBranch := Some("main")
 
 val Scala213 = "2.13.12"
-ThisBuild / crossScalaVersions := Seq(Scala213, "3.3.1")
+ThisBuild / crossScalaVersions := Seq(Scala213, "3.3.3")
 ThisBuild / scalaVersion := Scala213 // the default Scala
 
 lazy val root = tlCrossRootProject.aggregate(core, testkit)
@@ -44,8 +44,8 @@ lazy val core = crossProject(JVMPlatform)
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-core" % "2.10.0",
       "org.typelevel" %%% "cats-effect" % "3.5.2",
-      "co.fs2" %%% "fs2-core" % "3.9.2",
-      "com.launchdarkly" % "launchdarkly-java-server-sdk" % "6.2.1",
+      "co.fs2" %%% "fs2-core" % "3.9.4",
+      "com.launchdarkly" % "launchdarkly-java-server-sdk" % "7.1.1",
     ),
   )
 

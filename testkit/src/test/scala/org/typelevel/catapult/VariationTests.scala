@@ -20,7 +20,7 @@ import cats.data.{Chain, NonEmptyChain}
 import cats.effect._
 import cats.effect.std.Supervisor
 import com.launchdarkly.sdk.server.interfaces.FlagValueChangeEvent
-import com.launchdarkly.sdk.{LDUser, LDValue}
+import com.launchdarkly.sdk.{LDContext, LDValue}
 import org.typelevel.catapult.testkit._
 import weaver.SimpleIOSuite
 
@@ -30,7 +30,7 @@ object VariationTests extends SimpleIOSuite {
   test("serve value of boolean variations")(
     testClient.use { case (td, client) =>
       def getFooFlag =
-        client.stringVariation("foo", new LDUser.Builder("derek").build(), defaultValue = "default")
+        client.stringVariation("foo", LDContext.create("testContext"), defaultValue = "default")
 
       def setFooFlag(value: String) = IO(td.update(td.flag("foo").valueForAll(LDValue.of(value))))
 
@@ -52,7 +52,7 @@ object VariationTests extends SimpleIOSuite {
           received <- IO.ref[Chain[FlagValueChangeEvent]](Chain.empty)
           _ <- sup.supervise(
             client
-              .trackFlagValueChanges("foo", new LDUser.Builder("derek").build())
+              .trackFlagValueChanges("foo", LDContext.create("testContext"))
               .evalTap(event => received.update(_.append(event)))
               .compile
               .drain
