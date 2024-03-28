@@ -81,11 +81,18 @@ trait LaunchDarklyClient[F[_]] {
     * @return the flag value, suspended in the `F` effect. If evaluation fails for any reason, returns the default value.
     * @see [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/server/interfaces/LDClientInterface.html#jsonValueVariation(java.lang.String,com.launchdarkly.sdk.LDContext,com.launchdarkly.sdk.LDValue) LDClientInterface#jsonValueVariation]]
     */
-  def jsonVariation[Ctx: ContextEncoder](
+  def jsonValueVariation[Ctx: ContextEncoder](
       featureKey: String,
       context: Ctx,
       defaultValue: LDValue,
   ): F[LDValue]
+
+  @deprecated("use jsonValueVariation", "0.5.0")
+  final def jsonVariation[Ctx: ContextEncoder](
+      featureKey: String,
+      context: Ctx,
+      defaultValue: LDValue,
+  ): F[LDValue] = jsonValueVariation(featureKey, context, defaultValue)
 
   /** @param featureKey   the key of the flag to be evaluated
     * @param context      the context against which the flag is being evaluated
@@ -93,7 +100,16 @@ trait LaunchDarklyClient[F[_]] {
     * @return A `Stream` of [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/server/interfaces/FlagValueChangeEvent.html FlagValueChangeEvent]] instances representing changes to the value of the flag in the provided context. Note: if the flag value changes multiple times in quick succession, some intermediate values may be missed; for example, a change from 1` to `2` to `3` may be represented only as a change from `1` to `3`
     * @see [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/server/interfaces/FlagTracker.html FlagTracker]]
     */
-  def listen[Ctx: ContextEncoder](featureKey: String, context: Ctx): Stream[F, FlagValueChangeEvent]
+  def trackFlagValueChanges[Ctx: ContextEncoder](
+      featureKey: String,
+      context: Ctx,
+  ): Stream[F, FlagValueChangeEvent]
+
+  @deprecated("use trackFlagValueChanges", "0.5.0")
+  final def listen[Ctx: ContextEncoder](
+      featureKey: String,
+      context: Ctx,
+  ): Stream[F, FlagValueChangeEvent] = trackFlagValueChanges(featureKey, context)
 
   /** @see [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/server/interfaces/LDClientInterface.html#flush() LDClientInterface#flush]]
     */
@@ -131,7 +147,7 @@ object LaunchDarklyClient {
       override def unsafeWithJavaClient[A](f: LDClient => A): F[A] =
         F.blocking(f(ldClient))
 
-      override def listen[Ctx](
+      override def trackFlagValueChanges[Ctx](
           featureKey: String,
           context: Ctx,
       )(implicit ctxEncoder: ContextEncoder[Ctx]): Stream[F, FlagValueChangeEvent] =
@@ -188,7 +204,7 @@ object LaunchDarklyClient {
     )(implicit ctxEncoder: ContextEncoder[Ctx]): F[Double] =
       unsafeWithJavaClient(_.doubleVariation(featureKey, ctxEncoder.encode(context), default))
 
-    override def jsonVariation[Ctx](
+    override def jsonValueVariation[Ctx](
         featureKey: String,
         context: Ctx,
         default: LDValue,
@@ -202,10 +218,10 @@ object LaunchDarklyClient {
         self.unsafeWithJavaClient(f)
       )
 
-      override def listen[Ctx](featureKey: String, context: Ctx)(implicit
+      override def trackFlagValueChanges[Ctx](featureKey: String, context: Ctx)(implicit
           ctxEncoder: ContextEncoder[Ctx]
       ): Stream[G, FlagValueChangeEvent] =
-        self.listen(featureKey, context).translate(fk)
+        self.trackFlagValueChanges(featureKey, context).translate(fk)
 
       override def flush: G[Unit] = fk(self.flush)
     }
