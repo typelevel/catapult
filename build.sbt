@@ -1,5 +1,5 @@
 // https://typelevel.org/sbt-typelevel/faq.html#what-is-a-base-version-anyway
-ThisBuild / tlBaseVersion := "0.4" // your current series x.y
+ThisBuild / tlBaseVersion := "0.5" // your current series x.y
 
 ThisBuild / organization := "org.typelevel"
 ThisBuild / organizationName := "Typelevel"
@@ -18,7 +18,7 @@ ThisBuild / tlSonatypeUseLegacyHost := false
 ThisBuild / tlSitePublishBranch := Some("main")
 
 val Scala213 = "2.13.12"
-ThisBuild / crossScalaVersions := Seq(Scala213, "3.3.1")
+ThisBuild / crossScalaVersions := Seq(Scala213, "3.3.3")
 ThisBuild / scalaVersion := Scala213 // the default Scala
 
 lazy val root = tlCrossRootProject.aggregate(core, testkit)
@@ -29,7 +29,7 @@ lazy val testkit = crossProject(JVMPlatform)
   .settings(
     name := "catapult-testkit",
     libraryDependencies ++= Seq(
-      "com.disneystreaming" %% "weaver-cats" % "0.8.3" % Test
+      "com.disneystreaming" %% "weaver-cats" % "0.8.4" % Test
     ),
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
     tlVersionIntroduced := List("2.13", "3").map(_ -> "0.1.0").toMap,
@@ -44,7 +44,7 @@ lazy val core = crossProject(JVMPlatform)
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-core" % "2.10.0",
       "org.typelevel" %%% "cats-effect" % "3.5.4",
-      "co.fs2" %%% "fs2-core" % "3.9.2",
+      "co.fs2" %%% "fs2-core" % "3.9.4",
       "com.launchdarkly" % "launchdarkly-java-server-sdk" % "7.1.1",
     ),
   )
