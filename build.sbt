@@ -57,6 +57,10 @@ lazy val mtl = crossProject(JVMPlatform)
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-mtl" % "1.4.0"
     ),
+    tlVersionIntroduced := Map(
+      "2.13" -> "0.5.1",
+      "3" -> "0.5.1",
+    ),
   )
   .dependsOn(core)
 
