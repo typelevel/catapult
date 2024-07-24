@@ -21,7 +21,7 @@ val Scala213 = "2.13.12"
 ThisBuild / crossScalaVersions := Seq(Scala213, "3.3.3")
 ThisBuild / scalaVersion := Scala213 // the default Scala
 
-lazy val root = tlCrossRootProject.aggregate(core, testkit)
+lazy val root = tlCrossRootProject.aggregate(core, mtl, testkit)
 
 lazy val testkit = crossProject(JVMPlatform)
   .crossType(CrossType.Pure)
@@ -48,5 +48,20 @@ lazy val core = crossProject(JVMPlatform)
       "com.launchdarkly" % "launchdarkly-java-server-sdk" % "7.5.0",
     ),
   )
+
+lazy val mtl = crossProject(JVMPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("mtl"))
+  .settings(
+    name := "catapult-mtl",
+    libraryDependencies ++= Seq(
+      "org.typelevel" %% "cats-mtl" % "1.4.0"
+    ),
+    tlVersionIntroduced := Map(
+      "2.13" -> "0.5.1",
+      "3" -> "0.5.1",
+    ),
+  )
+  .dependsOn(core)
 
 lazy val docs = project.in(file("site")).enablePlugins(TypelevelSitePlugin)
