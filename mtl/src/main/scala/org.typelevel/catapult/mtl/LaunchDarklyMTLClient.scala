@@ -55,6 +55,7 @@ trait LaunchDarklyMTLClient[F[_]] {
     * @return the flag value, suspended in the `F` effect. If evaluation fails for any reason, or the evaluated value cannot be represented as type Int, returns the default value.
     * @see [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/server/interfaces/LDClientInterface.html#intVariation(java.lang.String,com.launchdarkly.sdk.LDContext,int) LDClientInterface#intVariation]]
     */
+  def intVariation(featureKey: String, defaultValue: Int): F[Int]
 
   /** @param featureKey   the key of the flag to be evaluated
     * @param defaultValue the value to use if evaluation fails for any reason
@@ -113,24 +114,27 @@ object LaunchDarklyMTLClient {
       launchDarklyClient: LaunchDarklyClient[F]
   )(implicit F: Monad[F], contextAsk: Ask[F, LDContext]): LaunchDarklyMTLClient[F] =
     new LaunchDarklyMTLClient[F] {
-      def flush: F[Unit] = launchDarklyClient.flush
+      override def flush: F[Unit] = launchDarklyClient.flush
 
-      def boolVariation(featureKey: String, defaultValue: Boolean): F[Boolean] =
+      override def boolVariation(featureKey: String, defaultValue: Boolean): F[Boolean] =
         contextAsk.ask.flatMap(launchDarklyClient.boolVariation(featureKey, _, defaultValue))
 
-      def doubleVariation(featureKey: String, defaultValue: Double): F[Double] =
+      override def intVariation(featureKey: String, defaultValue: Int): F[Int] =
+        contextAsk.ask.flatMap(launchDarklyClient.intVariation(featureKey, _, defaultValue))
+
+      override def doubleVariation(featureKey: String, defaultValue: Double): F[Double] =
         contextAsk.ask.flatMap(launchDarklyClient.doubleVariation(featureKey, _, defaultValue))
 
-      def jsonValueVariation(
+      override def jsonValueVariation(
           featureKey: String,
           defaultValue: com.launchdarkly.sdk.LDValue,
       ): F[com.launchdarkly.sdk.LDValue] =
         contextAsk.ask.flatMap(launchDarklyClient.jsonValueVariation(featureKey, _, defaultValue))
 
-      def stringVariation(featureKey: String, defaultValue: String): F[String] =
+      override def stringVariation(featureKey: String, defaultValue: String): F[String] =
         contextAsk.ask.flatMap(launchDarklyClient.stringVariation(featureKey, _, defaultValue))
 
-      def trackFlagValueChanges(
+      override def trackFlagValueChanges(
           featureKey: String
       ): fs2.Stream[F, com.launchdarkly.sdk.server.interfaces.FlagValueChangeEvent] =
         Stream.eval(contextAsk.ask).flatMap(launchDarklyClient.trackFlagValueChanges(featureKey, _))
@@ -138,21 +142,24 @@ object LaunchDarklyMTLClient {
 
   def mapK[F[_], G[_]](ldc: LaunchDarklyMTLClient[F])(fk: F ~> G): LaunchDarklyMTLClient[G] =
     new LaunchDarklyMTLClient[G] {
-      def boolVariation(featureKey: String, defaultValue: Boolean): G[Boolean] =
+      override def boolVariation(featureKey: String, defaultValue: Boolean): G[Boolean] =
         fk(ldc.boolVariation(featureKey, defaultValue))
 
-      def stringVariation(featureKey: String, defaultValue: String): G[String] =
+      override def stringVariation(featureKey: String, defaultValue: String): G[String] =
         fk(ldc.stringVariation(featureKey, defaultValue))
 
-      def doubleVariation(featureKey: String, defaultValue: Double): G[Double] =
+      override def intVariation(featureKey: String, defaultValue: Int): G[Int] =
+        fk(ldc.intVariation(featureKey, defaultValue))
+
+      override def doubleVariation(featureKey: String, defaultValue: Double): G[Double] =
         fk(ldc.doubleVariation(featureKey, defaultValue))
 
-      def jsonValueVariation(featureKey: String, defaultValue: LDValue): G[LDValue] =
+      override def jsonValueVariation(featureKey: String, defaultValue: LDValue): G[LDValue] =
         fk(ldc.jsonValueVariation(featureKey, defaultValue))
 
-      def trackFlagValueChanges(featureKey: String): Stream[G, FlagValueChangeEvent] =
+      override def trackFlagValueChanges(featureKey: String): Stream[G, FlagValueChangeEvent] =
         ldc.trackFlagValueChanges(featureKey).translate(fk)
 
-      def flush: G[Unit] = fk(ldc.flush)
+      override def flush: G[Unit] = fk(ldc.flush)
     }
 }
