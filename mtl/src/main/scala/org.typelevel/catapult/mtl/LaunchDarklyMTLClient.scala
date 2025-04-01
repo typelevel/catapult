@@ -77,6 +77,23 @@ trait LaunchDarklyMTLClient[F[_]] {
       defaultValue: LDValue,
   ): F[LDValue]
 
+  /** Retrieve the flag value, suspended in the `F` effect
+    *
+    * @param featureKey
+    *   Defines the key, type, and default value
+    * @see
+    *   [[FeatureKey]]
+    * @see
+    *   [[LaunchDarklyMTLClient.boolVariation()]]
+    * @see
+    *   [[LaunchDarklyMTLClient.stringVariation()]]
+    * @see
+    *   [[LaunchDarklyMTLClient.doubleVariation()]]
+    * @see
+    *   [[LaunchDarklyMTLClient.jsonValueVariation()]]
+    */
+  def variation(featureKey: FeatureKey): F[featureKey.Type]
+
   /** @param featureKey   the key of the flag to be evaluated
     * @return A `Stream` of [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/server/interfaces/FlagValueChangeEvent.html FlagValueChangeEvent]] instances representing changes to the value of the flag in the provided context. Note: if the flag value changes multiple times in quick succession, some intermediate values may be missed; for example, a change from 1` to `2` to `3` may be represented only as a change from `1` to `3`
     * @see [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/server/interfaces/FlagTracker.html FlagTracker]]
@@ -134,6 +151,9 @@ object LaunchDarklyMTLClient {
       override def stringVariation(featureKey: String, defaultValue: String): F[String] =
         contextAsk.ask.flatMap(launchDarklyClient.stringVariation(featureKey, _, defaultValue))
 
+      override def variation(featureKey: FeatureKey): F[featureKey.Type] =
+        contextAsk.ask.flatMap(featureKey.variation[F, LDContext](launchDarklyClient, _))
+
       override def trackFlagValueChanges(
           featureKey: String
       ): fs2.Stream[F, com.launchdarkly.sdk.server.interfaces.FlagValueChangeEvent] =
@@ -156,6 +176,9 @@ object LaunchDarklyMTLClient {
 
       override def jsonValueVariation(featureKey: String, defaultValue: LDValue): G[LDValue] =
         fk(ldc.jsonValueVariation(featureKey, defaultValue))
+
+      override def variation(featureKey: FeatureKey): G[featureKey.Type] =
+        fk(ldc.variation(featureKey))
 
       override def trackFlagValueChanges(featureKey: String): Stream[G, FlagValueChangeEvent] =
         ldc.trackFlagValueChanges(featureKey).translate(fk)

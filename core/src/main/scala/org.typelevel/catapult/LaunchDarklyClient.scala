@@ -19,10 +19,10 @@ package org.typelevel.catapult
 import cats.effect.std.{Dispatcher, Queue}
 import cats.effect.{Async, Resource}
 import cats.~>
+import com.launchdarkly.sdk.LDValue
 import com.launchdarkly.sdk.server.interfaces.{FlagValueChangeEvent, FlagValueChangeListener}
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
-import com.launchdarkly.sdk.LDValue
-import fs2._
+import fs2.*
 
 trait LaunchDarklyClient[F[_]] {
 
@@ -93,6 +93,23 @@ trait LaunchDarklyClient[F[_]] {
       context: Ctx,
       defaultValue: LDValue,
   ): F[LDValue] = jsonValueVariation(featureKey, context, defaultValue)
+
+  /** Retrieve the flag value, suspended in the `F` effect
+    *
+    * @param featureKey
+    *   Defines the key, type, and default value
+    * @see
+    *   [[FeatureKey]]
+    * @see
+    *   [[LaunchDarklyClient.boolVariation()]]
+    * @see
+    *   [[LaunchDarklyClient.stringVariation()]]
+    * @see
+    *   [[LaunchDarklyClient.doubleVariation()]]
+    * @see
+    *   [[LaunchDarklyClient.jsonValueVariation()]]
+    */
+  def variation[Ctx: ContextEncoder](featureKey: FeatureKey, ctx: Ctx): F[featureKey.Type]
 
   /** @param featureKey   the key of the flag to be evaluated
     * @param context      the context against which the flag is being evaluated
@@ -210,6 +227,12 @@ object LaunchDarklyClient {
         default: LDValue,
     )(implicit ctxEncoder: ContextEncoder[Ctx]): F[LDValue] =
       unsafeWithJavaClient(_.jsonValueVariation(featureKey, ctxEncoder.encode(context), default))
+
+    override def variation[Ctx: ContextEncoder](
+        featureKey: FeatureKey,
+        ctx: Ctx,
+    ): F[featureKey.Type] =
+      featureKey.variation[F, Ctx](this, ctx)
 
     override def flush: F[Unit] = unsafeWithJavaClient(_.flush())
 
