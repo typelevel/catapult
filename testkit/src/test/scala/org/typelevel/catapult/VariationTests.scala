@@ -65,9 +65,8 @@ object VariationTests extends SimpleIOSuite {
           result <- received.get
           unchained = NonEmptyChain
             .fromChain(
-              result.map(event =>
-                (event.getOldValue.stringValue(), event.getNewValue.stringValue())
-              )
+              result
+                .map(event => (event.getOldValue.stringValue(), event.getNewValue.stringValue()))
             )
             .map(_.reduceLeft { case ((old1, new1), (old2, new2)) =>
               if (old2 == new1) (old1, new2) else throw new Exception("")

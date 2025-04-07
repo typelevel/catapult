@@ -17,7 +17,7 @@ ThisBuild / tlSonatypeUseLegacyHost := false
 // publish website from this branch
 ThisBuild / tlSitePublishBranch := Some("main")
 
-val Scala213 = "2.13.14"
+val Scala213 = "2.13.16"
 ThisBuild / crossScalaVersions := Seq(Scala213, "3.3.5")
 ThisBuild / scalaVersion := Scala213 // the default Scala
 
@@ -43,9 +43,9 @@ lazy val core = crossProject(JVMPlatform)
     name := "catapult",
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-core" % "2.12.0",
-      "org.typelevel" %%% "cats-effect" % "3.5.4",
+      "org.typelevel" %%% "cats-effect" % "3.5.7",
       "co.fs2" %%% "fs2-core" % "3.10.2",
-      "com.launchdarkly" % "launchdarkly-java-server-sdk" % "7.5.0",
+      "com.launchdarkly" % "launchdarkly-java-server-sdk" % "7.7.0",
     ),
   )
 
