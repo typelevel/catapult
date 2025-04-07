@@ -52,7 +52,7 @@ object LDValueCodec {
                 )
               )
             }
-            .leftMap { _: SerializationException =>
+            .leftMap { (_: SerializationException) =>
               DecodingFailure("JSON value is not supported by LaunchDarkly LDValue", cursor.history)
             },
         jsonString = LDValue.of(_).asRight,

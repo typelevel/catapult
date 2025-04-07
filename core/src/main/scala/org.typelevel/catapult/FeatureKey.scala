@@ -46,7 +46,7 @@ object FeatureKey {
           client: LaunchDarklyClient[F],
           ctx: Ctx,
       ): F[Boolean] =
-        client.boolVariation(key, ctx, default)
+        client.boolVariation(this.key, ctx, this.default)
     }
 
   /** Define a feature key that is expected to return a string value.
@@ -61,7 +61,7 @@ object FeatureKey {
           client: LaunchDarklyClient[F],
           ctx: Ctx,
       ): F[String] =
-        client.stringVariation(key, ctx, default)
+        client.stringVariation(this.key, ctx, this.default)
     }
 
   /** Define a feature key that is expected to return a integer value.
@@ -76,7 +76,7 @@ object FeatureKey {
           client: LaunchDarklyClient[F],
           ctx: Ctx,
       ): F[Int] =
-        client.intVariation(key, ctx, default)
+        client.intVariation(this.key, ctx, this.default)
     }
 
   /** Define a feature key that is expected to return a double value.
@@ -91,7 +91,7 @@ object FeatureKey {
           client: LaunchDarklyClient[F],
           ctx: Ctx,
       ): F[Double] =
-        client.doubleVariation(key, ctx, default)
+        client.doubleVariation(this.key, ctx, this.default)
     }
 
   /** Define a feature key that is expected to return a JSON value.
@@ -109,7 +109,7 @@ object FeatureKey {
           client: LaunchDarklyClient[F],
           ctx: Ctx,
       ): F[LDValue] =
-        client.jsonValueVariation(key, ctx, default)
+        client.jsonValueVariation(this.key, ctx, this.default)
     }
 
   private val ldValueShow: Show[LDValue] = Show.show(_.toJsonString)
@@ -120,12 +120,5 @@ object FeatureKey {
     override val default: A = _default
 
     override def toString: String = s"FeatureKey($typeName, $key, ${default.show})"
-
-    override def equals(obj: Any): Boolean = obj match {
-      case other: FeatureKey => key == other.key && default == other.default
-      case _ => false
-    }
-
-    override def hashCode(): Int = ("FeatureKey", key.##, default.##).##
   }
 }
