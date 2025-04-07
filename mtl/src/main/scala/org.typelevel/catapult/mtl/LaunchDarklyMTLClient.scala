@@ -140,6 +140,29 @@ object LaunchDarklyMTLClient {
         Stream.eval(contextAsk.ask).flatMap(launchDarklyClient.trackFlagValueChanges(featureKey, _))
     }
 
+  def noop[F[_]](implicit F: Applicative[F]): LaunchDarklyMTLClient[F] =
+    new LaunchDarklyMTLClient[F] {
+      override def boolVariation(featureKey: String, defaultValue: Boolean): F[Boolean] =
+        F.pure(defaultValue)
+
+      override def stringVariation(featureKey: String, defaultValue: String): F[String] =
+        F.pure(defaultValue)
+
+      override def intVariation(featureKey: String, defaultValue: Int): F[Int] =
+        F.pure(defaultValue)
+
+      override def doubleVariation(featureKey: String, defaultValue: Double): F[Double] =
+        F.pure(defaultValue)
+
+      override def jsonValueVariation(featureKey: String, defaultValue: LDValue): F[LDValue] =
+        F.pure(defaultValue)
+
+      override def trackFlagValueChanges(featureKey: String): Stream[F, FlagValueChangeEvent] =
+        Stream.empty
+
+      override val flush: F[Unit] = F.unit
+    }
+
   def mapK[F[_], G[_]](ldc: LaunchDarklyMTLClient[F])(fk: F ~> G): LaunchDarklyMTLClient[G] =
     new LaunchDarklyMTLClient[G] {
       override def boolVariation(featureKey: String, defaultValue: Boolean): G[Boolean] =
@@ -160,6 +183,6 @@ object LaunchDarklyMTLClient {
       override def trackFlagValueChanges(featureKey: String): Stream[G, FlagValueChangeEvent] =
         ldc.trackFlagValueChanges(featureKey).translate(fk)
 
-      override def flush: G[Unit] = fk(ldc.flush)
+      override val flush: G[Unit] = fk(ldc.flush)
     }
 }
