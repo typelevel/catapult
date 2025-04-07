@@ -18,8 +18,8 @@ package org.typelevel.catapult
 
 import cats.effect.std.{Dispatcher, Queue}
 import cats.effect.{Async, Resource}
-import cats.~>
 import com.launchdarkly.sdk.LDValue
+import cats.{~>, Applicative}
 import com.launchdarkly.sdk.server.interfaces.{FlagValueChangeEvent, FlagValueChangeListener}
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
 import fs2.*
@@ -132,7 +132,7 @@ trait LaunchDarklyClient[F[_]] {
     */
   def flush: F[Unit]
 
-  def mapK[G[_]](fk: F ~> G): LaunchDarklyClient[G]
+  def mapK[G[_]](fk: F ~> G): LaunchDarklyClient[G] = LaunchDarklyClient.mapK[F, G](this)(fk)
 }
 
 object LaunchDarklyClient {
@@ -236,17 +236,96 @@ object LaunchDarklyClient {
 
     override def flush: F[Unit] = unsafeWithJavaClient(_.flush())
 
-    override def mapK[G[_]](fk: F ~> G): LaunchDarklyClient[G] = new LaunchDarklyClient.Default[G] {
-      override def unsafeWithJavaClient[A](f: LDClient => A): G[A] = fk(
-        self.unsafeWithJavaClient(f)
-      )
+    // TODO: Remove on next bin changing release, had to keep this for bin-compat.
+    override def mapK[G[_]](fk: F ~> G): LaunchDarklyClient[G] = LaunchDarklyClient.mapK(this)(fk)
+  }
 
-      override def trackFlagValueChanges[Ctx](featureKey: String, context: Ctx)(implicit
-          ctxEncoder: ContextEncoder[Ctx]
-      ): Stream[G, FlagValueChangeEvent] =
+  def noop[F[_]](implicit F: Applicative[F]): LaunchDarklyClient[F] = new LaunchDarklyClient[F] {
+    override def boolVariation[Ctx: ContextEncoder](
+        featureKey: String,
+        context: Ctx,
+        defaultValue: Boolean,
+    ): F[Boolean] = F.pure(defaultValue)
+    override def doubleVariation[Ctx: ContextEncoder](
+        featureKey: String,
+        context: Ctx,
+        defaultValue: Double,
+    ): F[Double] = F.pure(defaultValue)
+    override def intVariation[Ctx: ContextEncoder](
+        featureKey: String,
+        context: Ctx,
+        defaultValue: Int,
+    ): F[Int] = F.pure(defaultValue)
+    override def jsonValueVariation[Ctx: ContextEncoder](
+        featureKey: String,
+        context: Ctx,
+        defaultValue: LDValue,
+    ): F[LDValue] = F.pure(defaultValue)
+    override def stringVariation[Ctx: ContextEncoder](
+        featureKey: String,
+        context: Ctx,
+        defaultValue: String,
+    ): F[String] = F.pure(defaultValue)
+
+    override def trackFlagValueChanges[Ctx: ContextEncoder](
+        featureKey: String,
+        context: Ctx,
+    ): fs2.Stream[F, FlagValueChangeEvent] = fs2.Stream.empty
+
+    override def flush: F[Unit] = Applicative[F].unit
+
+    override def variation[Ctx: ContextEncoder](
+        featureKey: FeatureKey,
+        ctx: Ctx,
+    ): F[featureKey.Type] =
+      F.pure(featureKey.default)
+  }
+
+  def mapK[F[_], G[_]](self: LaunchDarklyClient[F])(fk: F ~> G): LaunchDarklyClient[G] =
+    new LaunchDarklyClient[G] {
+      override def boolVariation[Ctx: ContextEncoder](
+          featureKey: String,
+          context: Ctx,
+          defaultValue: Boolean,
+      ): G[Boolean] = fk(self.boolVariation(featureKey, context, defaultValue))
+
+      override def doubleVariation[Ctx: ContextEncoder](
+          featureKey: String,
+          context: Ctx,
+          defaultValue: Double,
+      ): G[Double] = fk(self.doubleVariation(featureKey, context, defaultValue))
+
+      override def intVariation[Ctx: ContextEncoder](
+          featureKey: String,
+          context: Ctx,
+          defaultValue: Int,
+      ): G[Int] = fk(self.intVariation(featureKey, context, defaultValue))
+
+      override def jsonValueVariation[Ctx: ContextEncoder](
+          featureKey: String,
+          context: Ctx,
+          defaultValue: LDValue,
+      ): G[LDValue] = fk(self.jsonValueVariation(featureKey, context, defaultValue))
+
+      override def stringVariation[Ctx: ContextEncoder](
+          featureKey: String,
+          context: Ctx,
+          defaultValue: String,
+      ): G[String] = fk(self.stringVariation(featureKey, context, defaultValue))
+
+      override def variation[Ctx: ContextEncoder](
+          featureKey: FeatureKey,
+          ctx: Ctx,
+      ): G[featureKey.Type] =
+        fk(self.variation(featureKey, ctx))
+
+      override def trackFlagValueChanges[Ctx: ContextEncoder](
+          featureKey: String,
+          context: Ctx,
+      ): fs2.Stream[G, FlagValueChangeEvent] =
         self.trackFlagValueChanges(featureKey, context).translate(fk)
 
       override def flush: G[Unit] = fk(self.flush)
     }
-  }
+
 }
