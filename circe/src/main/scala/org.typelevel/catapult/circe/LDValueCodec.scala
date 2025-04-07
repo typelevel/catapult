@@ -24,10 +24,11 @@ import io.circe.{Decoder, DecodingFailure, Encoder, Json}
 
 object LDValueCodec {
 
-  /** Decode a `circe` [[Json]] value as a `launchdarkly` [[LDValue]]
+  /** Decode a `circe` [[io.circe.Json]] value as a `com.launchdarkly.sdk.LDValue`
     *
     * The primary failure path is due to the encoding of JSON numbers as doubles
-    * in the [[LDValue]] type hierarchy
+    * in the `com.launchdarkly.sdk.LDValue` type hierarchy
+    * @see [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/LDValue.html LDValue]]
     */
   implicit val catapultLDValueDecoder: Decoder[LDValue] = Decoder.instance { cursor =>
     cursor.focus.fold(LDValue.ofNull().asRight[DecodingFailure]) { circeValue =>

@@ -101,13 +101,13 @@ trait LaunchDarklyClient[F[_]] {
     * @see
     *   [[FeatureKey]]
     * @see
-    *   [[LaunchDarklyClient.boolVariation()]]
+    *   [[boolVariation()]]
     * @see
-    *   [[LaunchDarklyClient.stringVariation()]]
+    *   [[stringVariation()]]
     * @see
-    *   [[LaunchDarklyClient.doubleVariation()]]
+    *   [[doubleVariation()]]
     * @see
-    *   [[LaunchDarklyClient.jsonValueVariation()]]
+    *   [[jsonValueVariation()]]
     */
   def variation[Ctx: ContextEncoder](featureKey: FeatureKey, ctx: Ctx): F[featureKey.Type]
 

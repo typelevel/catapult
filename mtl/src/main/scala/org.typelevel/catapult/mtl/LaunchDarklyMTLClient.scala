@@ -23,10 +23,10 @@ import com.launchdarkly.sdk.server.interfaces.FlagValueChangeEvent
 import com.launchdarkly.sdk.server.LDConfig
 import com.launchdarkly.sdk.LDContext
 import com.launchdarkly.sdk.LDValue
-import fs2._
-import cats._
-import cats.implicits._
-import cats.mtl._
+import fs2.*
+import cats.*
+import cats.implicits.*
+import cats.mtl.*
 
 trait LaunchDarklyMTLClient[F[_]] {
 
@@ -84,13 +84,13 @@ trait LaunchDarklyMTLClient[F[_]] {
     * @see
     *   [[FeatureKey]]
     * @see
-    *   [[LaunchDarklyMTLClient.boolVariation()]]
+    *   [[boolVariation]]
     * @see
-    *   [[LaunchDarklyMTLClient.stringVariation()]]
+    *   [[stringVariation]]
     * @see
-    *   [[LaunchDarklyMTLClient.doubleVariation()]]
+    *   [[doubleVariation]]
     * @see
-    *   [[LaunchDarklyMTLClient.jsonValueVariation()]]
+    *   [[jsonValueVariation]]
     */
   def variation(featureKey: FeatureKey): F[featureKey.Type]
 
