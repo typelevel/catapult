@@ -18,11 +18,11 @@ package org.typelevel.catapult
 
 import cats.effect.std.{Dispatcher, Queue}
 import cats.effect.{Async, Resource}
+import com.launchdarkly.sdk.LDValue
 import cats.{~>, Applicative}
 import com.launchdarkly.sdk.server.interfaces.{FlagValueChangeEvent, FlagValueChangeListener}
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
-import com.launchdarkly.sdk.LDValue
-import fs2._
+import fs2.*
 
 trait LaunchDarklyClient[F[_]] {
 
@@ -93,6 +93,23 @@ trait LaunchDarklyClient[F[_]] {
       context: Ctx,
       defaultValue: LDValue,
   ): F[LDValue] = jsonValueVariation(featureKey, context, defaultValue)
+
+  /** Retrieve the flag value, suspended in the `F` effect
+    *
+    * @param featureKey
+    *   Defines the key, type, and default value
+    * @see
+    *   [[FeatureKey]]
+    * @see
+    *   [[boolVariation]]
+    * @see
+    *   [[stringVariation]]
+    * @see
+    *   [[doubleVariation]]
+    * @see
+    *   [[jsonValueVariation]]
+    */
+  def variation[Ctx: ContextEncoder](featureKey: FeatureKey, ctx: Ctx): F[featureKey.Type]
 
   /** @param featureKey   the key of the flag to be evaluated
     * @param context      the context against which the flag is being evaluated
@@ -211,6 +228,12 @@ object LaunchDarklyClient {
     )(implicit ctxEncoder: ContextEncoder[Ctx]): F[LDValue] =
       unsafeWithJavaClient(_.jsonValueVariation(featureKey, ctxEncoder.encode(context), default))
 
+    override def variation[Ctx: ContextEncoder](
+        featureKey: FeatureKey,
+        ctx: Ctx,
+    ): F[featureKey.Type] =
+      featureKey.variation[F, Ctx](this, ctx)
+
     override def flush: F[Unit] = unsafeWithJavaClient(_.flush())
 
     // TODO: Remove on next bin changing release, had to keep this for bin-compat.
@@ -250,6 +273,12 @@ object LaunchDarklyClient {
     ): fs2.Stream[F, FlagValueChangeEvent] = fs2.Stream.empty
 
     override def flush: F[Unit] = Applicative[F].unit
+
+    override def variation[Ctx: ContextEncoder](
+        featureKey: FeatureKey,
+        ctx: Ctx,
+    ): F[featureKey.Type] =
+      F.pure(featureKey.default)
   }
 
   def mapK[F[_], G[_]](self: LaunchDarklyClient[F])(fk: F ~> G): LaunchDarklyClient[G] =
@@ -283,6 +312,12 @@ object LaunchDarklyClient {
           context: Ctx,
           defaultValue: String,
       ): G[String] = fk(self.stringVariation(featureKey, context, defaultValue))
+
+      override def variation[Ctx: ContextEncoder](
+          featureKey: FeatureKey,
+          ctx: Ctx,
+      ): G[featureKey.Type] =
+        fk(self.variation(featureKey, ctx))
 
       override def trackFlagValueChanges[Ctx: ContextEncoder](
           featureKey: String,
