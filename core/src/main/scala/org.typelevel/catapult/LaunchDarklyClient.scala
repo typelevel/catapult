@@ -16,10 +16,12 @@
 
 package org.typelevel.catapult
 
+import cats.data.Validated
 import cats.effect.std.{Dispatcher, Queue}
 import cats.effect.{Async, Resource}
+import cats.syntax.all.*
+import cats.{Applicative, ~>}
 import com.launchdarkly.sdk.LDValue
-import cats.{~>, Applicative}
 import com.launchdarkly.sdk.server.interfaces.{FlagValueChangeEvent, FlagValueChangeListener}
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
 import fs2.*
@@ -160,7 +162,7 @@ object LaunchDarklyClient {
       ldClient: LDClient
   )(implicit F: Async[F]): LaunchDarklyClient[F] =
     new LaunchDarklyClient.Default[F] {
-
+      override protected def async: Async[F] = Async[F]
       override def unsafeWithJavaClient[A](f: LDClient => A): F[A] =
         F.blocking(f(ldClient))
 
@@ -193,6 +195,7 @@ object LaunchDarklyClient {
 
   private trait Default[F[_]] extends LaunchDarklyClient[F] {
     self =>
+    implicit protected def async: Async[F]
     protected def unsafeWithJavaClient[A](f: LDClient => A): F[A]
 
     override def boolVariation[Ctx](
@@ -232,7 +235,18 @@ object LaunchDarklyClient {
         featureKey: FeatureKey,
         ctx: Ctx,
     ): F[featureKey.Type] =
-      featureKey.variation[F, Ctx](this, ctx)
+      jsonValueVariation[Ctx](featureKey.key, ctx, featureKey.ldValueDefault).flatMap { lv =>
+        featureKey.codec.decode(lv) match {
+          case Validated.Valid(a) => a.pure[F]
+          case Validated.Invalid(errors) =>
+            unsafeWithJavaClient { client =>
+              val logger = client.getLogger
+              async.blocking {
+                logger.error(errors.mkString_("Unable to decode LDValue\n", "\n", "\n"), Nil *)
+              }
+            }.flatMap(_.as(featureKey.default))
+        }
+      }
 
     override def flush: F[Unit] = unsafeWithJavaClient(_.flush())
 

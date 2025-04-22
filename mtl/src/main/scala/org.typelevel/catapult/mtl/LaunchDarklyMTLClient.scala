@@ -152,7 +152,7 @@ object LaunchDarklyMTLClient {
         contextAsk.ask.flatMap(launchDarklyClient.stringVariation(featureKey, _, defaultValue))
 
       override def variation(featureKey: FeatureKey): F[featureKey.Type] =
-        contextAsk.ask.flatMap(featureKey.variation[F, LDContext](launchDarklyClient, _))
+        contextAsk.ask.flatMap(launchDarklyClient.variation(featureKey, _))
 
       override def trackFlagValueChanges(
           featureKey: String
