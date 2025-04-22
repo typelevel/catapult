@@ -242,7 +242,7 @@ object LaunchDarklyClient {
             unsafeWithJavaClient { client =>
               val logger = client.getLogger
               async.blocking {
-                logger.error(errors.mkString_("Unable to decode LDValue\n", "\n", "\n"), Nil *)
+                logger.error("{}", errors.mkString_("Unable to decode LDValue\n", "\n", "\n"))
               }
             }.flatMap(_.as(featureKey.default))
         }
