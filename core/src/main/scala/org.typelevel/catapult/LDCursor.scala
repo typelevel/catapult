@@ -24,45 +24,93 @@ import org.typelevel.catapult.LDCodec.DecodingFailed
 import org.typelevel.catapult.LDCodec.DecodingFailed.Reason.{
   IndexOutOfBounds,
   MissingField,
+  UnableToDecodeKey,
   WrongType,
 }
 import org.typelevel.catapult.LDCursor.LDCursorHistory.Move
 import org.typelevel.catapult.LDCursor.{LDArrayCursor, LDCursorHistory, LDObjectCursor}
 
+/** A lens that represents a position in an `LDValue` that supports one-way navigation
+  * and decoding using `LDCodec` instances.
+  */
 sealed trait LDCursor {
+
+  /** The current value pointed to by the cursor.
+    *
+    * @note This is guaranteed to be non-null
+    */
   def value: LDValue
 
+  /** The path to the current value
+    */
   def history: LDCursorHistory
 
+  /** Attempt to decode the current value to an `A`
+    */
   def as[A: LDCodec]: ValidatedNec[DecodingFailed, A]
 
+  /** Ensure the type of `value` matches the expected `LDValueType`
+    *
+    * @see [[asArray]] if the expected type is `ARRAY`
+    */
   def checkType(expected: LDValueType): ValidatedNec[DecodingFailed, LDCursor]
 
+  /** Ensure the type of `value` is `ARRAY` and return an `LDCursor`
+    * specialized to working with `LDValue` arrays
+    */
   def asArray: ValidatedNec[DecodingFailed, LDArrayCursor]
 
+  /** Ensure the type of `value` is `OBJECT` and return an `LDCursor`
+    * specialized to working with `LDValue` objects
+    */
   def asObject: ValidatedNec[DecodingFailed, LDObjectCursor]
 }
 
 object LDCursor {
   def root(value: LDValue): LDCursor = new Impl(LDValue.normalize(value), LDCursorHistory.root)
+
   def of(value: LDValue, history: LDCursorHistory): LDCursor =
     new Impl(LDValue.normalize(value), history)
 
+  /** An [[LDCursor]] that is specialized to work with `LDValue` arrays
+    */
   sealed trait LDArrayCursor extends LDCursor {
+
+    /** Descend to the given index
+      *
+      * @note Bounds checking will be done on `index`
+      */
     def at(index: Int): ValidatedNec[DecodingFailed, LDCursor]
 
+    /** Attempt to decode the value at the given index as an `A`
+      *
+      * @note Bounds checking will be done on `index`
+      */
     def get[A: LDCodec](index: Int): ValidatedNec[DecodingFailed, A] =
       at(index).andThen(_.as[A])
 
+    /** Attempt to decode all the entries as `A`s
+      *
+      * @note This will generally be more efficient than repeated calls to [[get]]
+      */
     def elements[A: LDCodec]: ValidatedNec[DecodingFailed, Vector[A]]
   }
 
+  /** An [[LDCursor]] that is specialized to work with `LDValue` objects
+    */
   sealed trait LDObjectCursor extends LDCursor {
+
+    /** Descend to value at the given field
+      */
     def at(field: String): ValidatedNec[DecodingFailed, LDCursor]
 
+    /** Attempt to decode the value the given field as an `A`
+      */
     def get[A: LDCodec](field: String): ValidatedNec[DecodingFailed, A] =
       at(field).andThen(_.as[A])
 
+    /** Attempt to decode the entire object as a vector of `(K, V)` entries
+      */
     def entries[K: LDKeyCodec, V: LDCodec]: ValidatedNec[DecodingFailed, Vector[(K, V)]]
   }
 
@@ -144,6 +192,7 @@ object LDCursor {
 
     override def elements[A: LDCodec]: ValidatedNec[DecodingFailed, Vector[A]] = {
       val builder = Vector.newBuilder[ValidatedNec[DecodingFailed, A]]
+      builder.sizeHint(value.size())
       var idx = 0
       value.values().forEach { ldValue =>
         builder.addOne(
@@ -195,10 +244,15 @@ object LDCursor {
     override def entries[K: LDKeyCodec, V: LDCodec]
         : ValidatedNec[DecodingFailed, Vector[(K, V)]] = {
       val builder = Vector.newBuilder[ValidatedNec[DecodingFailed, (K, V)]]
+      builder.sizeHint(value.size())
       value.keys().forEach { field =>
         val updatedHistory = history.at(field)
         val decodedEntry = (
-          LDKeyCodec[K].decode(field).leftMap(_.map(DecodingFailed(_, updatedHistory))),
+          LDKeyCodec[K]
+            .decode(field)
+            .leftMap(_.map { reason =>
+              DecodingFailed(UnableToDecodeKey(reason), updatedHistory)
+            }),
           LDCodec[V].decode(LDCursor.of(LDValue.normalize(value.get(field)), updatedHistory)),
         ).tupled
         builder.addOne(decodedEntry)

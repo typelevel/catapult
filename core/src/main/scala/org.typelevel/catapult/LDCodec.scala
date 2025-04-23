@@ -17,7 +17,7 @@
 package org.typelevel.catapult
 
 import cats.Show
-import cats.data.{Chain, NonEmptyChain, NonEmptyList, NonEmptyVector, Validated, ValidatedNec}
+import cats.data.*
 import cats.syntax.all.*
 import com.launchdarkly.sdk.{LDValue, LDValueType}
 import org.typelevel.catapult.LDCodec.DecodingFailed
@@ -25,13 +25,29 @@ import org.typelevel.catapult.LDCodec.DecodingFailed.Reason
 import org.typelevel.catapult.LDCursor.LDCursorHistory
 
 import scala.collection.Factory
+import scala.reflect.ClassTag
 
+/** A type class that provides a way to convert a value of type `A` to and from `LDValue`
+  */
 trait LDCodec[A] { self =>
+
+  /** Encode a value to `LDValue`
+    */
   def encode(a: A): LDValue
+
+  /** Decode the given `LDCursor`
+    */
   def decode(c: LDCursor): ValidatedNec[DecodingFailed, A]
 
+  /** Decode the given `LDValue`
+    */
   def decode(ld: LDValue): ValidatedNec[DecodingFailed, A] = decode(LDCursor.root(ld))
 
+  /** Transform a `LDCodec[A]` into an `LDCodec[B]` by providing a transformation
+    * from `A` to `B` and one from `B` to `A`
+    *
+    * @see [[imapV]] or [[imapVFull]] if the transformations can fail
+    */
   def imap[B](bToA: B => A, aToB: A => B): LDCodec[B] = new LDCodec[B] {
     override def encode(a: B): LDValue = self.encode(bToA(a))
 
@@ -39,6 +55,11 @@ trait LDCodec[A] { self =>
       self.decode(c).map(aToB)
   }
 
+  /** A variant of [[imap]] which allows the transformation from `A` to `B`
+    * to fail
+    *
+    * @see [[imapVFull]] if the failure can affect the history
+    */
   def imapV[B](bToA: B => A, aToB: A => ValidatedNec[Reason, B]): LDCodec[B] = new LDCodec[B] {
     override def encode(a: B): LDValue = self.encode(bToA(a))
 
@@ -48,6 +69,9 @@ trait LDCodec[A] { self =>
       }
   }
 
+  /** A variant of [[imap]] which allows the transformation from `A` to `B`
+    * to fail with an updated history
+    */
   def imapVFull[B](
       bToA: B => A,
       aToB: (A, LDCursorHistory) => ValidatedNec[DecodingFailed, B],
@@ -71,12 +95,18 @@ object LDCodec {
       override def decode(c: LDCursor): ValidatedNec[DecodingFailed, A] = _decode(c)
     }
 
+  /** Encodes a failure while decoding from an `LDValue`
+    */
   sealed trait DecodingFailed {
+
+    /** The reason for the decoding failure
+      */
     def reason: DecodingFailed.Reason
 
+    /** The path to the point where the failure occurred
+      */
     def history: LDCursorHistory
   }
-
   object DecodingFailed {
     def apply(reason: Reason, history: LDCursorHistory): DecodingFailed = new Impl(reason, history)
 
@@ -226,17 +256,20 @@ object LDCodec {
           .map(factory.fromSpecific(_))
     }
 
-  implicit def vectorInstance[A: LDCodec]: LDCodec[Vector[A]] =
+  implicit def ldArrayToArrayInstance[A: LDCodec: ClassTag]: LDCodec[Array[A]] =
+    ldArrayInstance[Array, A](_.iterator, Array)
+
+  implicit def ldArrayToVectorInstance[A: LDCodec]: LDCodec[Vector[A]] =
     ldArrayInstance[Vector, A](_.iterator, Vector)
 
-  implicit def listInstance[A: LDCodec]: LDCodec[List[A]] =
+  implicit def ldArrayToListInstance[A: LDCodec]: LDCodec[List[A]] =
     ldArrayInstance[List, A](_.iterator, List)
 
-  implicit def chainInstance[A: LDCodec]: LDCodec[Chain[A]] =
-    vectorInstance[A].imap[Chain[A]](_.toVector, Chain.fromSeq)
+  implicit def ldArrayToChainInstance[A: LDCodec]: LDCodec[Chain[A]] =
+    ldArrayToVectorInstance[A].imap[Chain[A]](_.toVector, Chain.fromSeq)
 
-  implicit def nonEmptyListInstance[A: LDCodec]: LDCodec[NonEmptyList[A]] =
-    listInstance[A].imapVFull[NonEmptyList[A]](
+  implicit def ldArrayToNonEmptyListInstance[A: LDCodec]: LDCodec[NonEmptyList[A]] =
+    ldArrayToListInstance[A].imapVFull[NonEmptyList[A]](
       _.toList,
       (list, history) =>
         NonEmptyList.fromList(list).toValidNec {
@@ -244,8 +277,8 @@ object LDCodec {
         },
     )
 
-  implicit def nonEmptyVectorInstance[A: LDCodec]: LDCodec[NonEmptyVector[A]] =
-    vectorInstance[A].imapVFull[NonEmptyVector[A]](
+  implicit def ldArrayToNonEmptyVectorInstance[A: LDCodec]: LDCodec[NonEmptyVector[A]] =
+    ldArrayToVectorInstance[A].imapVFull[NonEmptyVector[A]](
       _.toVector,
       (vec, history) =>
         NonEmptyVector.fromVector(vec).toValidNec {
@@ -253,8 +286,8 @@ object LDCodec {
         },
     )
 
-  implicit def nonEmptyChainInstance[A: LDCodec]: LDCodec[NonEmptyChain[A]] =
-    chainInstance[A].imapVFull[NonEmptyChain[A]](
+  implicit def ldArrayToNonEmptyChainInstance[A: LDCodec]: LDCodec[NonEmptyChain[A]] =
+    ldArrayToChainInstance[A].imapVFull[NonEmptyChain[A]](
       _.toChain,
       (chain, history) =>
         NonEmptyChain.fromChain(chain).toValidNec {
@@ -281,6 +314,50 @@ object LDCodec {
           .map(factory.fromSpecific(_))
     }
 
-  implicit def mapInstance[K: LDKeyCodec, V: LDCodec]: LDCodec[Map[K, V]] =
+  implicit def ldObjectToPairsInstance[K: LDKeyCodec, V: LDCodec]: LDCodec[Map[K, V]] =
     ldObjectInstance[Map[K, V], K, V](_.iterator, Map)
+
+  implicit def ldObjectToArrayInstance[K: LDKeyCodec, V: LDCodec](implicit
+      ct: ClassTag[(K, V)]
+  ): LDCodec[Array[(K, V)]] =
+    ldObjectInstance[Array[(K, V)], K, V](_.iterator, Array)
+
+  implicit def ldObjectToVectorInstance[K: LDKeyCodec, V: LDCodec]: LDCodec[Vector[(K, V)]] =
+    ldObjectInstance[Vector[(K, V)], K, V](_.iterator, Vector)
+
+  implicit def ldObjectToListInstance[K: LDKeyCodec, V: LDCodec]: LDCodec[List[(K, V)]] =
+    ldObjectInstance[List[(K, V)], K, V](_.iterator, List)
+
+  implicit def ldObjectToChainInstance[K: LDKeyCodec, V: LDCodec]: LDCodec[Chain[(K, V)]] =
+    ldObjectToVectorInstance[K, V].imap[Chain[(K, V)]](_.toVector, Chain.fromSeq)
+
+  implicit def ldObjectToNonEmptyListInstance[K: LDKeyCodec, V: LDCodec]
+      : LDCodec[NonEmptyList[(K, V)]] =
+    ldObjectToListInstance[K, V].imapVFull[NonEmptyList[(K, V)]](
+      _.toList,
+      (list, history) =>
+        NonEmptyList.fromList(list).toValidNec {
+          DecodingFailed(Reason.IndexOutOfBounds, history.at(0))
+        },
+    )
+
+  implicit def ldObjectToNonEmptyVectorInstance[K: LDKeyCodec, V: LDCodec]
+      : LDCodec[NonEmptyVector[(K, V)]] =
+    ldObjectToVectorInstance[K, V].imapVFull[NonEmptyVector[(K, V)]](
+      _.toVector,
+      (vec, history) =>
+        NonEmptyVector.fromVector(vec).toValidNec {
+          DecodingFailed(Reason.IndexOutOfBounds, history.at(0))
+        },
+    )
+
+  implicit def ldObjectToNonEmptyChainInstance[K: LDKeyCodec, V: LDCodec]
+      : LDCodec[NonEmptyChain[(K, V)]] =
+    ldObjectToChainInstance[K, V].imapVFull[NonEmptyChain[(K, V)]](
+      _.toChain,
+      (chain, history) =>
+        NonEmptyChain.fromChain(chain).toValidNec {
+          DecodingFailed(Reason.IndexOutOfBounds, history.at(0))
+        },
+    )
 }

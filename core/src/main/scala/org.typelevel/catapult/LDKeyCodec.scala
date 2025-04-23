@@ -20,10 +20,29 @@ import cats.data.ValidatedNec
 import cats.syntax.all.*
 import org.typelevel.catapult.LDCodec.DecodingFailed.Reason
 
+/** A type class that provides a conversion from a `String` to used as an `LDValue` object key to and from a value of type `A`
+  */
 trait LDKeyCodec[A] { self =>
+
+  /** Encode a given `A` to a `String` to use as an `LDValue` object key
+    *
+    * @note If more than one `A` maps to the same `String` the behavior of the duplication
+    *       is determined by the `LValue` implementation.
+    */
   def encode(a: A): String
+
+  /** Attempt to decode a `String` from an `LValue` object key as an `A`
+    *
+    * @note If more than one `String` maps to the same `A`, the resulting value may have
+    *       fewer entries than the original `LDValue`
+    */
   def decode(str: String): ValidatedNec[Reason, A]
 
+  /** Transform a `LDKeyCodec[A]` into an `LDKeyCodec[B]` by providing a transformation
+    * from `A` to `B` and one from `B` to `A`
+    *
+    * @see [[imapV]] if the transformations can fail
+    */
   def imap[B](bToA: B => A, aToB: A => B): LDKeyCodec[B] = new LDKeyCodec[B] {
     override def encode(a: B): String = self.encode(bToA(a))
 
@@ -31,6 +50,9 @@ trait LDKeyCodec[A] { self =>
       self.decode(str).map(aToB)
   }
 
+  /** A variant of [[imap]] which allows the transformation from `A` to `B`
+    * to fail
+    */
   def imapV[B](bToA: B => A, aToB: A => ValidatedNec[Reason, B]): LDKeyCodec[B] =
     new LDKeyCodec[B] {
       override def encode(a: B): String = self.encode(bToA(a))
