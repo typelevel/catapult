@@ -37,7 +37,7 @@ object CirceFeatureKey {
   def featureKey(
       key: String,
       default: Json,
-  ): Decoder.Result[FeatureKey.Aux[LDValue]] =
+  ): Decoder.Result[FeatureKey.Aux[Json]] =
     default.as[LDValue].map(FeatureKey.ldValue(key, _))
 
   /** Define a feature key that is expected to return a JSON value.
