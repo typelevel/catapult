@@ -104,13 +104,11 @@ object LDValueCodec {
         }
         Json.fromValues(builder.result())
       case LDValueType.OBJECT =>
-        val builder = Vector.newBuilder[(String, LDValue)]
+        val builder = Vector.newBuilder[(String, Json)]
         normalized.keys().forEach { key =>
-          builder.addOne(key -> normalized.get(key))
+          builder.addOne(key -> catapultLDValueEncoder(normalized.get(key)))
         }
-        Json.fromFields(builder.result().map { case (key, value) =>
-          key -> catapultLDValueEncoder(value)
-        })
+        Json.fromFields(builder.result())
     }
   }
 }
