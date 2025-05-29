@@ -36,8 +36,6 @@ object mtlClient {
         .flatMap(client.jsonValueVariation(featureKey, _))
         .map(_.asJson)
 
-    def circeVariation(featureKey: FeatureKey.Aux[LDValue])(implicit F: MonadThrow[F]): F[Json] =
-      client.variation(featureKey).map(_.asJson)
 
     def circeVariationAs[A: Decoder](featureKey: String, defaultValue: Json)(implicit
         F: MonadThrow[F]
