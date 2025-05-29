@@ -48,9 +48,5 @@ object mtlClient {
         .flatMap(client.jsonValueVariation(featureKey, _))
         .flatMap(_.asJson.as[A].liftTo[F])
 
-    def circeVariationAs[A: Decoder](featureKey: FeatureKey.Aux[LDValue])(implicit
-        F: MonadThrow[F]
-    ): F[A] =
-      client.variation(featureKey).flatMap(_.asJson.as[A].liftTo[F])
   }
 }
