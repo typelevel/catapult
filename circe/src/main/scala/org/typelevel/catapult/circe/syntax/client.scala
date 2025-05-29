@@ -49,10 +49,5 @@ object client {
         .flatMap(client.jsonValueVariation(featureKey, ctx, _))
         .flatMap(_.asJson.as[A].liftTo[F])
 
-    def circeVariationAs[A: Decoder, Ctx: ContextEncoder](
-        featureKey: FeatureKey.Aux[LDValue],
-        ctx: Ctx,
-    )(implicit F: MonadThrow[F]): F[A] =
-      client.variation(featureKey, ctx).flatMap(_.asJson.as[A].liftTo[F])
   }
 }
