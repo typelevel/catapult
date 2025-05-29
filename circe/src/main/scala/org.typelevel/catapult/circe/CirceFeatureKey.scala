@@ -53,6 +53,6 @@ object CirceFeatureKey {
   def featureKeyEncoded[A: Encoder](
       key: String,
       default: A,
-  ): Decoder.Result[FeatureKey.Aux[LDValue]] =
+  ): Decoder.Result[FeatureKey.Aux[A]] =
     featureKey(key, default.asJson)
 }
