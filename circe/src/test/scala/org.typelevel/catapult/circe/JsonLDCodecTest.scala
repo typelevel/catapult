@@ -18,14 +18,14 @@ package org.typelevel.catapult.circe
 
 import cats.syntax.all.*
 import com.launchdarkly.sdk.LDValue
-import io.circe.syntax._
 import munit.ScalaCheckSuite
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Prop.*
 import org.scalacheck.{Arbitrary, Gen}
-import org.typelevel.catapult.circe.LDValueCodec._
+import org.typelevel.catapult.circe.JsonLDCodec.*
+import org.typelevel.catapult.instances.*
 
-class LDValueCodecTest extends ScalaCheckSuite {
+class JsonLDCodecTest extends ScalaCheckSuite {
   private val maxDepth = 3
   private val maxEntries = 5
   private val maxFields = 5
@@ -72,14 +72,17 @@ class LDValueCodecTest extends ScalaCheckSuite {
 
   implicit private val arbLDValue: Arbitrary[LDValue] = Arbitrary(genLDValue(0))
 
-  property("LDValueSerde round trip")(forAll { (input: LDValue) =>
-    input.asJson
-      .as[LDValue]
+  property("circeLDCodecForJSON round trip")(forAll { (input: LDValue) =>
+    circeLDCodecForJSON
+      .decode(input)
+      .andThen(circeLDCodecForJSON.encode)
+      .leftMap(_.toNonEmptyVector.toVector) // Displays better in MUnit
       .map { output =>
-        if (input == output) proved
+        // Important: do not swap out eqv for LDValue.equals (which is asymmetric)
+        if (input.eqv(output)) proved
         else
           falsified :| s"Expected ${input.toJsonString} but was ${output.toJsonString}"
       }
-      .valueOr(fail("Conversion failed", _))
+      .valueOr(failures => fail("Conversion failed", clues(failures)))
   })
 }

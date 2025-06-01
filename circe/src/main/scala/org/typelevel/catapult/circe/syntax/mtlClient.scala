@@ -18,11 +18,11 @@ package org.typelevel.catapult.circe.syntax
 
 import cats.MonadThrow
 import cats.syntax.all.*
-import com.launchdarkly.sdk.LDValue
 import io.circe.syntax.*
-import io.circe.{Decoder, Json}
-import org.typelevel.catapult.FeatureKey
-import org.typelevel.catapult.circe.LDValueCodec.*
+import io.circe.{Decoder, Encoder, Json}
+import org.typelevel.catapult.circe.JsonLDCodec.*
+import org.typelevel.catapult.codec.LDCursorHistory
+import org.typelevel.catapult.codec.syntax.*
 import org.typelevel.catapult.mtl.LaunchDarklyMTLClient
 
 object mtlClient {
@@ -31,20 +31,16 @@ object mtlClient {
   ) extends AnyVal {
     def circeVariation(featureKey: String, defaultValue: Json)(implicit F: MonadThrow[F]): F[Json] =
       defaultValue
-        .as[LDValue]
+        .asLDValueOrFailure(LDCursorHistory.root)
+        .asEncodingFailure
         .liftTo[F]
         .flatMap(client.jsonValueVariation(featureKey, _))
-        .map(_.asJson)
+        .flatMap(_.decode[Json].asDecodingFailure.liftTo[F])
 
-
-    def circeVariationAs[A: Decoder](featureKey: String, defaultValue: Json)(implicit
+    def circeVariationAs[A: Decoder: Encoder](featureKey: String, defaultValue: A)(implicit
         F: MonadThrow[F]
     ): F[A] =
-      defaultValue
-        .as[LDValue]
-        .liftTo[F]
-        .flatMap(client.jsonValueVariation(featureKey, _))
-        .flatMap(_.asJson.as[A].liftTo[F])
-
+      circeVariation(featureKey, defaultValue.asJson)
+        .flatMap(_.as[A].liftTo[F])
   }
 }

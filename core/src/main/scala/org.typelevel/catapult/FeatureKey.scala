@@ -16,9 +16,13 @@
 
 package org.typelevel.catapult
 
-import cats.Show
 import cats.syntax.all.*
+import cats.Show
+import cats.kernel.Hash
 import com.launchdarkly.sdk.LDValue
+import org.typelevel.catapult.codec.LDCodec.LDCodecResult
+import org.typelevel.catapult.codec.{LDCodec, LDCodecWithInfallibleEncode, LDCursorHistory}
+import org.typelevel.catapult.instances.*
 
 /** Defines a Launch Darkly key, it's expected type, and a default value
   */
@@ -40,8 +44,17 @@ object FeatureKey {
     * @param default
     *   a value to return if the retrieval fails or the value cannot be decoded to an `A`
     */
-  def instance[A: Show: LDCodec](key: String, default: A): FeatureKey.Aux[A] =
-    new Impl[A](key, default)
+  def instance[A: LDCodecWithInfallibleEncode](key: String, default: A): FeatureKey.Aux[A] =
+    new Impl[A](key, default, LDCodecWithInfallibleEncode[A].safeEncode(default))
+
+  /** Define a feature key that is expected to return a value of type `A`
+    * @param key
+    *   the key of the flag
+    * @param default
+    *   a value to return if the retrieval fails or the value cannot be decoded to an `A`
+    */
+  def instanceOrFailure[A: LDCodec](key: String, default: A): LDCodecResult[FeatureKey.Aux[A]] =
+    LDCodec[A].encode(default, LDCursorHistory.root).map(new Impl[A](key, default, _))
 
   /** Define a feature key that is expected to return a boolean value.
     * @param key
@@ -65,7 +78,8 @@ object FeatureKey {
     * @param default
     *   a value to return if the retrieval fails or the type is not expected
     */
-  def int(key: String, default: Int): FeatureKey.Aux[Int] = instance[Int](key, default)
+  def int(key: String, default: Int): LDCodecResult[FeatureKey.Aux[Int]] =
+    instanceOrFailure[Int](key, default)
 
   /** Define a feature key that is expected to return a double value.
     * @param key
@@ -84,19 +98,27 @@ object FeatureKey {
     * @param default
     *   a value to return if the retrieval fails or the type is not expected
     */
-  def ldValue(key: String, default: LDValue): FeatureKey.Aux[LDValue] = {
-    implicit def ldValueShow: Show[LDValue] = FeatureKey.ldValueShow
-    new Impl[LDValue](key, default)
-  }
+  def ldValue(key: String, default: LDValue): FeatureKey.Aux[LDValue] =
+    new Impl[LDValue](key, default, default)
 
-  private val ldValueShow: Show[LDValue] = Show.show(_.toJsonString)
-  private final case class Impl[A: Show: LDCodec](_key: String, _default: A) extends FeatureKey {
+  implicit val show: Show[FeatureKey] = Show.fromToString
+  implicit val hash: Hash[FeatureKey] = Hash.by(fk => (fk.key, fk.ldValueDefault))
+
+  private final class Impl[A: LDCodec](_key: String, _default: A, _ldValueDefault: LDValue)
+      extends FeatureKey {
     override type Type = A
     override val key: String = _key
     override val codec: LDCodec[A] = LDCodec[A]
-    override val ldValueDefault: LDValue = codec.encode(_default)
+    override val ldValueDefault: LDValue = _ldValueDefault
     override def default: A = _default
 
-    override def toString: String = s"FeatureKey($key, ${_default.show})"
+    override def toString: String = s"FeatureKey($key, ${ldValueDefault.show})"
+
+    override def hashCode(): Int = FeatureKey.hash.hash(this)
+
+    override def equals(obj: Any): Boolean = obj match {
+      case that: FeatureKey => FeatureKey.hash.eqv(this, that)
+      case _ => false
+    }
   }
 }

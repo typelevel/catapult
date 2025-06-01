@@ -16,11 +16,11 @@
 
 package org.typelevel.catapult.circe
 
-import com.launchdarkly.sdk.LDValue
-import io.circe.syntax.*
 import io.circe.{Decoder, Encoder, Json}
 import org.typelevel.catapult.FeatureKey
-import org.typelevel.catapult.circe.LDValueCodec.*
+import org.typelevel.catapult.circe.JsonLDCodec.circeLDCodecForJSON
+import org.typelevel.catapult.codec.LDCodec
+import org.typelevel.catapult.codec.LDCodec.LDCodecResult
 
 object CirceFeatureKey {
 
@@ -37,8 +37,8 @@ object CirceFeatureKey {
   def featureKey(
       key: String,
       default: Json,
-  ): Decoder.Result[FeatureKey.Aux[Json]] =
-    default.as[LDValue].map(FeatureKey.ldValue(key, _))
+  ): LDCodecResult[FeatureKey.Aux[Json]] =
+    FeatureKey.instanceOrFailure(key, default)
 
   /** Define a feature key that is expected to return a JSON value.
     *
@@ -50,9 +50,11 @@ object CirceFeatureKey {
     * @param default
     *   a value to return if the retrieval fails or the type is not expected
     */
-  def featureKeyEncoded[A: Encoder](
+  def featureKeyEncoded[A: Encoder: Decoder](
       key: String,
       default: A,
-  ): Decoder.Result[FeatureKey.Aux[A]] =
-    featureKey(key, default.asJson)
+  ): LDCodecResult[FeatureKey.Aux[A]] = {
+    implicit val ldCodec: LDCodec[A] = JsonLDCodec.ldCodecFromCirceCodec[A]
+    FeatureKey.instanceOrFailure(key, default)
+  }
 }
