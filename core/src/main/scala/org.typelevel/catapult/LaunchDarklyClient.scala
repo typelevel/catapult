@@ -16,13 +16,15 @@
 
 package org.typelevel.catapult
 
+import cats.data.Validated
 import cats.effect.std.{Dispatcher, Queue}
 import cats.effect.{Async, Resource}
-import cats.{~>, Applicative}
+import cats.syntax.all.*
+import cats.{Applicative, ~>}
+import com.launchdarkly.sdk.LDValue
 import com.launchdarkly.sdk.server.interfaces.{FlagValueChangeEvent, FlagValueChangeListener}
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
-import com.launchdarkly.sdk.LDValue
-import fs2._
+import fs2.*
 
 trait LaunchDarklyClient[F[_]] {
 
@@ -94,6 +96,23 @@ trait LaunchDarklyClient[F[_]] {
       defaultValue: LDValue,
   ): F[LDValue] = jsonValueVariation(featureKey, context, defaultValue)
 
+  /** Retrieve the flag value, suspended in the `F` effect
+    *
+    * @param featureKey
+    *   Defines the key, type, and default value
+    * @see
+    *   [[FeatureKey]]
+    * @see
+    *   [[boolVariation]]
+    * @see
+    *   [[stringVariation]]
+    * @see
+    *   [[doubleVariation]]
+    * @see
+    *   [[jsonValueVariation]]
+    */
+  def variation[Ctx: ContextEncoder](featureKey: FeatureKey, ctx: Ctx): F[featureKey.Type]
+
   /** @param featureKey   the key of the flag to be evaluated
     * @param context      the context against which the flag is being evaluated
     * @tparam Ctx the type representing the context; this can be [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/LDContext.html LDContext]], [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/LDUser.html LDUser]], or any type with a [[ContextEncoder]] instance in scope.
@@ -143,7 +162,7 @@ object LaunchDarklyClient {
       ldClient: LDClient
   )(implicit F: Async[F]): LaunchDarklyClient[F] =
     new LaunchDarklyClient.Default[F] {
-
+      override protected def async: Async[F] = Async[F]
       override def unsafeWithJavaClient[A](f: LDClient => A): F[A] =
         F.blocking(f(ldClient))
 
@@ -176,6 +195,7 @@ object LaunchDarklyClient {
 
   private trait Default[F[_]] extends LaunchDarklyClient[F] {
     self =>
+    implicit protected def async: Async[F]
     protected def unsafeWithJavaClient[A](f: LDClient => A): F[A]
 
     override def boolVariation[Ctx](
@@ -210,6 +230,23 @@ object LaunchDarklyClient {
         default: LDValue,
     )(implicit ctxEncoder: ContextEncoder[Ctx]): F[LDValue] =
       unsafeWithJavaClient(_.jsonValueVariation(featureKey, ctxEncoder.encode(context), default))
+
+    override def variation[Ctx: ContextEncoder](
+        featureKey: FeatureKey,
+        ctx: Ctx,
+    ): F[featureKey.Type] =
+      jsonValueVariation[Ctx](featureKey.key, ctx, featureKey.ldValueDefault).flatMap { lv =>
+        featureKey.codec.decode(lv) match {
+          case Validated.Valid(a) => a.pure[F]
+          case Validated.Invalid(errors) =>
+            unsafeWithJavaClient { client =>
+              val logger = client.getLogger
+              async.blocking {
+                logger.error("{}", errors.mkString_("Unable to decode LDValue\n", "\n", "\n"))
+              }
+            }.flatMap(_.as(featureKey.default))
+        }
+      }
 
     override def flush: F[Unit] = unsafeWithJavaClient(_.flush())
 
@@ -250,6 +287,12 @@ object LaunchDarklyClient {
     ): fs2.Stream[F, FlagValueChangeEvent] = fs2.Stream.empty
 
     override def flush: F[Unit] = Applicative[F].unit
+
+    override def variation[Ctx: ContextEncoder](
+        featureKey: FeatureKey,
+        ctx: Ctx,
+    ): F[featureKey.Type] =
+      F.pure(featureKey.default)
   }
 
   def mapK[F[_], G[_]](self: LaunchDarklyClient[F])(fk: F ~> G): LaunchDarklyClient[G] =
@@ -283,6 +326,12 @@ object LaunchDarklyClient {
           context: Ctx,
           defaultValue: String,
       ): G[String] = fk(self.stringVariation(featureKey, context, defaultValue))
+
+      override def variation[Ctx: ContextEncoder](
+          featureKey: FeatureKey,
+          ctx: Ctx,
+      ): G[featureKey.Type] =
+        fk(self.variation(featureKey, ctx))
 
       override def trackFlagValueChanges[Ctx: ContextEncoder](
           featureKey: String,
