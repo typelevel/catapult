@@ -26,7 +26,7 @@ lazy val testkit = crossProject(JVMPlatform)
   .settings(
     name := "catapult-testkit",
     libraryDependencies ++= Seq(
-      "com.disneystreaming" %% "weaver-cats" % "0.8.4" % Test
+      "org.typelevel" %% "weaver-cats" % "0.9.0" % Test
     ),
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
     tlVersionIntroduced := List("2.13", "3").map(_ -> "0.1.0").toMap,
