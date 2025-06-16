@@ -1,5 +1,5 @@
 // https://typelevel.org/sbt-typelevel/faq.html#what-is-a-base-version-anyway
-ThisBuild / tlBaseVersion := "0.6" // your current series x.y
+ThisBuild / tlBaseVersion := "0.7" // your current series x.y
 
 ThisBuild / organization := "org.typelevel"
 ThisBuild / organizationName := "Typelevel"
@@ -18,7 +18,7 @@ val Scala213 = "2.13.16"
 ThisBuild / crossScalaVersions := Seq(Scala213, "3.3.6")
 ThisBuild / scalaVersion := Scala213 // the default Scala
 
-lazy val root = tlCrossRootProject.aggregate(core, mtl, testkit)
+lazy val root = tlCrossRootProject.aggregate(core, mtl, testkit, circe)
 
 lazy val testkit = crossProject(JVMPlatform)
   .crossType(CrossType.Pure)
@@ -60,5 +60,22 @@ lazy val mtl = crossProject(JVMPlatform)
     ),
   )
   .dependsOn(core)
+
+lazy val circe = crossProject(JVMPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("circe"))
+  .settings(
+    name := "catapult-circe",
+    libraryDependencies ++= Seq(
+      "io.circe" %% "circe-core" % "0.14.12",
+      "io.circe" %% "circe-parser" % "0.14.12",
+      "org.scalameta" %% "munit-scalacheck" % "1.1.0" % Test,
+    ),
+    tlVersionIntroduced := Map(
+      "2.13" -> "0.7.0",
+      "3" -> "0.7.0",
+    ),
+  )
+  .dependsOn(core, mtl)
 
 lazy val docs = project.in(file("site")).enablePlugins(TypelevelSitePlugin)
