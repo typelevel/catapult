@@ -67,8 +67,8 @@ lazy val circe = crossProject(JVMPlatform)
   .settings(
     name := "catapult-circe",
     libraryDependencies ++= Seq(
-      "io.circe" %% "circe-core" % "0.14.12",
-      "io.circe" %% "circe-parser" % "0.14.12",
+      "io.circe" %% "circe-core" % "0.14.14",
+      "io.circe" %% "circe-parser" % "0.14.14",
       "org.scalameta" %% "munit-scalacheck" % "1.1.0" % Test,
     ),
     tlVersionIntroduced := Map(
