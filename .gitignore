@@ -11,6 +11,9 @@ src_managed/
 # intellij
 .idea/
 
+# OSX
+.DS_Store
+
 # ignore [ce]tags files
 tags
 
