@@ -128,7 +128,7 @@ trait LaunchDarklyClient[F[_]] {
   /** @param featureKey   the key of the flag to be evaluated
     * @param context      the context against which the flag is being evaluated
     * @tparam Ctx the type representing the context; this can be [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/LDContext.html LDContext]], [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/LDUser.html LDUser]], or any type with a [[ContextEncoder]] instance in scope.
-    * @return A `Stream` of [[FlagValueChanged]] instances representing changes to the value of the flag in the provided context. These are wrapped in [[LDCodecResult]] as changing key may not always be decodable to [[FeatureKey.Type]]
+    * @return A `Stream` of [[FlagValueChanged]] instances representing changes to the value of the flag in the provided context. These are wrapped in `LDCodecResult` as changing key may not always be decodable to [[FeatureKey.Type]]
     * @note If the flag value changes multiple times in quick succession, some intermediate values may be missed; for example, a change from 1` to `2` to `3` may be represented only as a change from `1` to `3`
     * @see [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/server/interfaces/FlagTracker.html FlagTracker]]
     */
