@@ -25,6 +25,7 @@ import com.launchdarkly.sdk.LDValue
 import com.launchdarkly.sdk.server.interfaces.{FlagValueChangeEvent, FlagValueChangeListener}
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
 import fs2.*
+import org.typelevel.catapult.codec.LDCodec.LDCodecResult
 
 trait LaunchDarklyClient[F[_]] {
 
@@ -123,6 +124,18 @@ trait LaunchDarklyClient[F[_]] {
       featureKey: String,
       context: Ctx,
   ): Stream[F, FlagValueChangeEvent]
+
+  /** @param featureKey   the key of the flag to be evaluated
+    * @param context      the context against which the flag is being evaluated
+    * @tparam Ctx the type representing the context; this can be [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/LDContext.html LDContext]], [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/LDUser.html LDUser]], or any type with a [[ContextEncoder]] instance in scope.
+    * @return A `Stream` of [[FlagValueChanged]] instances representing changes to the value of the flag in the provided context. These are wrapped in `LDCodecResult` as changing key may not always be decodable to [[FeatureKey.Type]]
+    * @note If the flag value changes multiple times in quick succession, some intermediate values may be missed; for example, a change from 1` to `2` to `3` may be represented only as a change from `1` to `3`
+    * @see [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/server/interfaces/FlagTracker.html FlagTracker]]
+    */
+  def trackFlagValueChanges[Ctx: ContextEncoder](
+      featureKey: FeatureKey,
+      context: Ctx,
+  ): Stream[F, LDCodecResult[FlagValueChanged[featureKey.Type]]]
 
   @deprecated("use trackFlagValueChanges", "0.5.0")
   final def listen[Ctx: ContextEncoder](
@@ -250,6 +263,12 @@ object LaunchDarklyClient {
 
     override def flush: F[Unit] = unsafeWithJavaClient(_.flush())
 
+    override def trackFlagValueChanges[Ctx: ContextEncoder](
+        featureKey: FeatureKey,
+        context: Ctx,
+    ): Stream[F, LDCodecResult[FlagValueChanged[featureKey.Type]]] =
+      trackFlagValueChanges[Ctx](featureKey.key, context).map(FlagValueChanged(_)(featureKey.codec))
+
     // TODO: Remove on next bin changing release, had to keep this for bin-compat.
     override def mapK[G[_]](fk: F ~> G): LaunchDarklyClient[G] = LaunchDarklyClient.mapK(this)(fk)
   }
@@ -285,6 +304,12 @@ object LaunchDarklyClient {
         featureKey: String,
         context: Ctx,
     ): fs2.Stream[F, FlagValueChangeEvent] = fs2.Stream.empty
+
+    override def trackFlagValueChanges[Ctx: ContextEncoder](
+        featureKey: FeatureKey,
+        context: Ctx,
+    ): Stream[F, LDCodecResult[FlagValueChanged[featureKey.Type]]] =
+      fs2.Stream.empty
 
     override def flush: F[Unit] = Applicative[F].unit
 
@@ -337,6 +362,12 @@ object LaunchDarklyClient {
           featureKey: String,
           context: Ctx,
       ): fs2.Stream[G, FlagValueChangeEvent] =
+        self.trackFlagValueChanges(featureKey, context).translate(fk)
+
+      override def trackFlagValueChanges[Ctx: ContextEncoder](
+          featureKey: FeatureKey,
+          context: Ctx,
+      ): Stream[G, LDCodecResult[FlagValueChanged[featureKey.Type]]] =
         self.trackFlagValueChanges(featureKey, context).translate(fk)
 
       override def flush: G[Unit] = fk(self.flush)

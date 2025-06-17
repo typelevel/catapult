@@ -27,6 +27,7 @@ import fs2.*
 import cats.*
 import cats.implicits.*
 import cats.mtl.*
+import org.typelevel.catapult.codec.LDCodec.LDCodecResult
 
 trait LaunchDarklyMTLClient[F[_]] {
 
@@ -102,6 +103,15 @@ trait LaunchDarklyMTLClient[F[_]] {
       featureKey: String
   ): Stream[F, FlagValueChangeEvent]
 
+  /** @param featureKey   the key of the flag to be evaluated
+    * @return A `Stream` of [[FlagValueChanged]] instances representing changes to the value of the flag in the provided context. These are wrapped in `LDCodecResult` as changing key may not always be decodable to [[FeatureKey.Type]]
+    * @note If the flag value changes multiple times in quick succession, some intermediate values may be missed; for example, a change from 1` to `2` to `3` may be represented only as a change from `1` to `3`
+    * @see [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/server/interfaces/FlagTracker.html FlagTracker]]
+    */
+  def trackFlagValueChanges(
+      featureKey: FeatureKey
+  ): Stream[F, LDCodecResult[FlagValueChanged[featureKey.Type]]]
+
   /** @see [[https://javadoc.io/doc/com.launchdarkly/launchdarkly-java-server-sdk/latest/com/launchdarkly/sdk/server/interfaces/LDClientInterface.html#flush() LDClientInterface#flush]]
     */
   def flush: F[Unit]
@@ -158,6 +168,11 @@ object LaunchDarklyMTLClient {
           featureKey: String
       ): fs2.Stream[F, com.launchdarkly.sdk.server.interfaces.FlagValueChangeEvent] =
         Stream.eval(contextAsk.ask).flatMap(launchDarklyClient.trackFlagValueChanges(featureKey, _))
+
+      override def trackFlagValueChanges(
+          featureKey: FeatureKey
+      ): Stream[F, LDCodecResult[FlagValueChanged[featureKey.Type]]] =
+        trackFlagValueChanges(featureKey.key).map(FlagValueChanged(_)(featureKey.codec))
     }
 
   def noop[F[_]](implicit F: Applicative[F]): LaunchDarklyMTLClient[F] =
@@ -178,6 +193,11 @@ object LaunchDarklyMTLClient {
         F.pure(defaultValue)
 
       override def trackFlagValueChanges(featureKey: String): Stream[F, FlagValueChangeEvent] =
+        Stream.empty
+
+      override def trackFlagValueChanges(
+          featureKey: FeatureKey
+      ): Stream[F, LDCodecResult[FlagValueChanged[featureKey.Type]]] =
         Stream.empty
 
       override def variation(featureKey: FeatureKey): F[featureKey.Type] =
@@ -207,6 +227,11 @@ object LaunchDarklyMTLClient {
         fk(ldc.variation(featureKey))
 
       override def trackFlagValueChanges(featureKey: String): Stream[G, FlagValueChangeEvent] =
+        ldc.trackFlagValueChanges(featureKey).translate(fk)
+
+      override def trackFlagValueChanges(
+          featureKey: FeatureKey
+      ): Stream[G, LDCodecResult[FlagValueChanged[featureKey.Type]]] =
         ldc.trackFlagValueChanges(featureKey).translate(fk)
 
       override val flush: G[Unit] = fk(ldc.flush)
