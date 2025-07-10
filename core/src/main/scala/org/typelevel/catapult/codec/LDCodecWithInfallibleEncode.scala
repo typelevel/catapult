@@ -19,11 +19,7 @@ package org.typelevel.catapult.codec
 import cats.Invariant
 import cats.syntax.all.*
 import com.launchdarkly.sdk.{LDValue, LDValueType}
-import org.typelevel.catapult.codec.LDCodec.{
-  LDCodecResult,
-  withInfallibleEncode,
-  withInfallibleEncodeFull,
-}
+import org.typelevel.catapult.codec.LDCodec.{LDCodecResult, withInfallibleEncode}
 
 trait LDCodecWithInfallibleEncode[A] extends LDCodec[A] {
 
@@ -58,19 +54,19 @@ object LDCodecWithInfallibleEncode {
   implicit val ldValueInstance: LDCodecWithInfallibleEncode[LDValue] =
     withInfallibleEncode(identity, _.value)
 
-  implicit val booleanInstance: LDCodecWithInfallibleEncode[Boolean] = withInfallibleEncodeFull(
+  implicit val booleanInstance: LDCodecWithInfallibleEncode[Boolean] = instanceFull(
     LDValue.of,
     _.checkType(LDValueType.BOOLEAN).map(_.value.booleanValue()),
   )
 
-  implicit val stringInstance: LDCodecWithInfallibleEncode[String] = withInfallibleEncodeFull(
+  implicit val stringInstance: LDCodecWithInfallibleEncode[String] = instanceFull(
     LDValue.of,
     _.checkType(LDValueType.STRING).map(_.value.stringValue()),
   )
 
   // This is the canonical encoding of numbers in an LDValue, other
   // numerical types are derived from this because of this constraint.
-  implicit val doubleInstance: LDCodecWithInfallibleEncode[Double] = withInfallibleEncodeFull(
+  implicit val doubleInstance: LDCodecWithInfallibleEncode[Double] = instanceFull(
     LDValue.of,
     _.checkType(LDValueType.NUMBER).map(_.value.doubleValue()),
   )

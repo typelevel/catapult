@@ -168,21 +168,26 @@ object LDCodec {
       typeName: String,
       toDouble: N => Double,
       fromDouble: Double => N,
-  ): LDCodec[N] = LDCodec[Double].imapV[N](
-    n => {
+  ): LDCodec[N] = new LDCodec[N] {
+    override def encode(n: N, history: LDCursorHistory): LDCodecResult[LDValue] = {
       val d = toDouble(n)
-      Validated
-        .condNec(toDouble(n) == d, d, LDReason.undecodableValue(LDValueType.NUMBER, typeName))
-    },
-    d => {
-      val n = fromDouble(d)
       Validated.condNec(
         toDouble(n) == d,
-        n,
-        LDReason.unencodableValue(LDValueType.NUMBER, typeName),
+        LDValue.of(d),
+        LDCodecFailure(LDReason.undecodableValue(LDValueType.NUMBER, typeName), history),
       )
-    },
-  )
+    }
+
+    override def decode(c: LDCursor): LDCodecResult[N] =
+      c.checkType(LDValueType.NUMBER).map(_.value.doubleValue()).andThen { d =>
+        val n = fromDouble(d)
+        Validated.condNec(
+          toDouble(n) == d,
+          n,
+          c.fail(LDReason.unencodableValue(LDValueType.NUMBER, typeName)),
+        )
+      }
+  }
 
   implicit val floatInstance: LDCodec[Float] = numericInstance("Float", _.toDouble, _.toFloat)
 
