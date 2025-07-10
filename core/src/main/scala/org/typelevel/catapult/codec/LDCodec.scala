@@ -174,7 +174,7 @@ object LDCodec {
       Validated.condNec(
         toDouble(n) == d,
         LDValue.of(d),
-        LDCodecFailure(LDReason.undecodableValue(LDValueType.NUMBER, typeName), history)
+        LDCodecFailure(LDReason.undecodableValue(LDValueType.NUMBER, typeName), history),
       )
     }
 
