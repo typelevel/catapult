@@ -236,4 +236,52 @@ object LaunchDarklyMTLClient {
 
       override val flush: G[Unit] = fk(ldc.flush)
     }
+
+  implicit final class LaunchDarklyMtlClientGuardOps[F[_]](
+      private val client: LaunchDarklyMTLClient[F]
+  ) extends AnyVal {
+    def whenV[A](
+        featureKey: FeatureKey.Aux[Boolean]
+    )(block: => F[A])(implicit F: Monad[F]): F[Unit] =
+      client
+        .variation(featureKey)
+        .flatMap(F.whenA(_)(block))
+
+    def whenV[A](featureKey: String, default: Boolean)(
+        block: => F[A]
+    )(implicit F: Monad[F]): F[Unit] =
+      client
+        .boolVariation(featureKey, default)
+        .flatMap(F.whenA(_)(block))
+
+    def unlessV[A](
+        featureKey: FeatureKey.Aux[Boolean]
+    )(block: => F[A])(implicit F: Monad[F]): F[Unit] =
+      client
+        .variation(featureKey)
+        .flatMap(F.unlessA(_)(block))
+
+    def unlessV[A](featureKey: String, default: Boolean)(
+        block: => F[A]
+    )(implicit F: Monad[F]): F[Unit] =
+      client
+        .boolVariation(featureKey, default)
+        .flatMap(F.unlessA(_)(block))
+
+    def ifV[A](
+        featureKey: FeatureKey.Aux[Boolean]
+    )(ifTrue: => F[A], ifFalse: => F[A])(implicit F: Monad[F]): F[A] =
+      F.ifM(client.variation(featureKey))(
+        ifTrue = ifTrue,
+        ifFalse = ifFalse,
+      )
+
+    def ifV[A](featureKey: String, default: Boolean)(ifTrue: => F[A], ifFalse: => F[A])(implicit
+        F: Monad[F]
+    ): F[A] =
+      F.ifM(client.boolVariation(featureKey, default))(
+        ifTrue = ifTrue,
+        ifFalse = ifFalse,
+      )
+  }
 }

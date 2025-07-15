@@ -20,7 +20,7 @@ import cats.data.Validated
 import cats.effect.std.{Dispatcher, Queue}
 import cats.effect.{Async, Resource}
 import cats.syntax.all.*
-import cats.{Applicative, ~>}
+import cats.{Applicative, Monad, ~>}
 import com.launchdarkly.sdk.LDValue
 import com.launchdarkly.sdk.server.interfaces.{FlagValueChangeEvent, FlagValueChangeListener}
 import com.launchdarkly.sdk.server.{LDClient, LDConfig}
@@ -373,4 +373,52 @@ object LaunchDarklyClient {
       override def flush: G[Unit] = fk(self.flush)
     }
 
+  implicit final class LaunchDarklyClientGuardOps[F[_]](private val client: LaunchDarklyClient[F])
+      extends AnyVal {
+    def whenV[Ctx: ContextEncoder, A](featureKey: FeatureKey.Aux[Boolean], ctx: Ctx)(
+        block: => F[A]
+    )(implicit F: Monad[F]): F[Unit] =
+      client
+        .variation(featureKey, ctx)
+        .flatMap(F.whenA(_)(block))
+
+    def whenV[Ctx: ContextEncoder, A](featureKey: String, ctx: Ctx, default: Boolean)(
+        block: => F[A]
+    )(implicit F: Monad[F]): F[Unit] =
+      client
+        .boolVariation(featureKey, ctx, default)
+        .flatMap(F.whenA(_)(block))
+
+    def unlessV[Ctx: ContextEncoder, A](featureKey: FeatureKey.Aux[Boolean], ctx: Ctx)(
+        block: => F[A]
+    )(implicit F: Monad[F]): F[Unit] =
+      client
+        .variation(featureKey, ctx)
+        .flatMap(F.unlessA(_)(block))
+
+    def unlessV[Ctx: ContextEncoder, A](featureKey: String, ctx: Ctx, default: Boolean)(
+        block: => F[A]
+    )(implicit F: Monad[F]): F[Unit] =
+      client
+        .boolVariation(featureKey, ctx, default)
+        .flatMap(F.unlessA(_)(block))
+
+    def ifV[Ctx: ContextEncoder, A](
+        featureKey: FeatureKey.Aux[Boolean],
+        ctx: Ctx,
+    )(ifTrue: => F[A], ifFalse: => F[A])(implicit F: Monad[F]): F[A] =
+      F.ifM(client.variation(featureKey, ctx))(
+        ifTrue = ifTrue,
+        ifFalse = ifFalse,
+      )
+
+    def ifV[Ctx: ContextEncoder, A](featureKey: String, ctx: Ctx, default: Boolean)(
+        ifTrue: => F[A],
+        ifFalse: => F[A],
+    )(implicit F: Monad[F]): F[A] =
+      F.ifM(client.boolVariation(featureKey, ctx, default))(
+        ifTrue = ifTrue,
+        ifFalse = ifFalse,
+      )
+  }
 }
