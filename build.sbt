@@ -52,7 +52,7 @@ lazy val mtl = crossProject(JVMPlatform)
   .settings(
     name := "catapult-mtl",
     libraryDependencies ++= Seq(
-      "org.typelevel" %% "cats-mtl" % "1.5.0"
+      "org.typelevel" %% "cats-mtl" % "1.6.0"
     ),
     tlVersionIntroduced := Map(
       "2.13" -> "0.5.1",
