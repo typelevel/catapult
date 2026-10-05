@@ -92,18 +92,6 @@ object LDCodec {
       override def decode(c: LDCursor): LDCodecResult[A] = _decode(c)
     }
 
-  def withInfallibleEncode[A](
-      encode: A => LDValue,
-      decode: LDCursor => A,
-  ): LDCodecWithInfallibleEncode[A] =
-    LDCodecWithInfallibleEncode.instance(encode, decode)
-
-  def withInfallibleEncodeFull[A](
-      encode: A => LDValue,
-      decode: LDCursor => LDCodecResult[A],
-  ): LDCodecWithInfallibleEncode[A] =
-    LDCodecWithInfallibleEncode.instanceFull(encode, decode)
-
   final class DecodingFailure(val failures: NonEmptyChain[LDCodecFailure])
       extends IllegalArgumentException {
     override def getMessage: String =
@@ -115,8 +103,6 @@ object LDCodec {
     override def getMessage: String =
       failures.mkString_("Failed to encode to LDValue:\n", "\n", "\n")
   }
-
-  implicit def promoteTheSubclass[A](implicit LA: LDCodecWithInfallibleEncode[A]): LDCodec[A] = LA
 
   private def imapVFull[A, B](
       codec: LDCodec[A],
@@ -189,14 +175,34 @@ object LDCodec {
       }
   }
 
+  implicit val ldValueInstance: LDCodec[LDValue] =
+    instance((value, _) => value.valid, _.value.valid)
+
+  implicit val booleanInstance: LDCodec[Boolean] = instance(
+    (value, _) => LDValue.of(value).valid,
+    _.checkType(LDValueType.BOOLEAN).map(_.value.booleanValue()),
+  )
+
+  implicit val stringInstance: LDCodec[String] = instance(
+    (value, _) => LDValue.of(value).valid,
+    _.checkType(LDValueType.STRING).map(_.value.stringValue()),
+  )
+
+  // This is the canonical encoding of numbers in an LDValue, other
+  // numerical types are derived from this because of this constraint.
+  implicit val doubleInstance: LDCodec[Double] = instance(
+    (value, _) => LDValue.of(value).valid,
+    _.checkType(LDValueType.NUMBER).map(_.value.doubleValue()),
+  )
+
   implicit val floatInstance: LDCodec[Float] = numericInstance("Float", _.toDouble, _.toFloat)
 
   implicit val intInstance: LDCodec[Int] = numericInstance("Int", _.toDouble, _.toInt)
 
   implicit val longInstance: LDCodec[Long] = numericInstance("Long", _.toDouble, _.toLong)
 
-  implicit val noneInstance: LDCodecWithInfallibleEncode[None.type] = withInfallibleEncodeFull(
-    _ => LDValue.ofNull(),
+  implicit val noneInstance: LDCodec[None.type] = instance(
+    (_, _) => LDValue.ofNull().valid,
     _.checkType(LDValueType.NULL).as(None),
   )
 
@@ -229,21 +235,6 @@ object LDCodec {
       .toInvalid(builder.result())
   }
 
-  def makeIterableWithInfallibleEncodeInstance[F[_], A](
-      toIterator: F[A] => Iterator[A],
-      factory: Factory[A, F[A]],
-  )(implicit CA: LDCodecWithInfallibleEncode[A]): LDCodecWithInfallibleEncode[F[A]] =
-    LDCodecWithInfallibleEncode.instanceFull[F[A]](
-      fa => {
-        val builder = LDValue.buildArray()
-        toIterator(fa).foreach { elem =>
-          builder.add(CA.safeEncode(elem))
-        }
-        builder.build()
-      },
-      decodeIterableShaped(factory),
-    )
-
   def makeIterableInstance[F[_], A](toIterator: F[A] => Iterator[A], factory: Factory[A, F[A]])(
       implicit CA: LDCodec[A]
   ): LDCodec[F[A]] =
@@ -264,30 +255,14 @@ object LDCodec {
       decodeIterableShaped(factory),
     )
 
-  implicit def iterableWithInfallibleEncodeInstance[A: LDCodecWithInfallibleEncode]
-      : LDCodecWithInfallibleEncode[Iterable[A]] =
-    makeIterableWithInfallibleEncodeInstance[Iterable, A](_.iterator, Iterable)
-
   implicit def iterableInstance[A: LDCodec]: LDCodec[Iterable[A]] =
     makeIterableInstance[Iterable, A](_.iterator, Iterable)
-
-  implicit def arrayWithInfallibleEncodeInstance[A: ClassTag: LDCodecWithInfallibleEncode]
-      : LDCodecWithInfallibleEncode[Array[A]] =
-    makeIterableWithInfallibleEncodeInstance[Array, A](_.iterator, Array)
 
   implicit def arrayInstance[A: ClassTag: LDCodec]: LDCodec[Array[A]] =
     makeIterableInstance[Array, A](_.iterator, Array)
 
-  implicit def vectorWithInfallibleEncodeInstance[A: LDCodecWithInfallibleEncode]
-      : LDCodecWithInfallibleEncode[Vector[A]] =
-    makeIterableWithInfallibleEncodeInstance[Vector, A](_.iterator, Vector)
-
   implicit def vectorInstance[A: LDCodec]: LDCodec[Vector[A]] =
     makeIterableInstance[Vector, A](_.iterator, Vector)
-
-  implicit def listWithInfallibleEncodeInstance[A: LDCodecWithInfallibleEncode]
-      : LDCodecWithInfallibleEncode[List[A]] =
-    makeIterableWithInfallibleEncodeInstance[List, A](_.iterator, List)
 
   implicit def listInstance[A: LDCodec]: LDCodec[List[A]] =
     makeIterableInstance[List, A](_.iterator, List)
@@ -359,24 +334,6 @@ object LDCodec {
       .toInvalid(builder.result())
   }
 
-  def makeObjectShapedWithInfallibleEncodeInstance[CC, K, V](
-      toIterator: CC => Iterator[(K, V)],
-      factory: Factory[(K, V), CC],
-  )(implicit
-      CK: LDKeyCodec.WithInfallibleEncode[K],
-      CV: LDCodecWithInfallibleEncode[V],
-  ): LDCodecWithInfallibleEncode[CC] =
-    LDCodecWithInfallibleEncode.instanceFull[CC](
-      cc => {
-        val builder = LDValue.buildObject()
-        toIterator(cc).foreach { case (k, v) =>
-          builder.put(CK.safeEncode(k), CV.safeEncode(v))
-        }
-        builder.build()
-      },
-      decodeObjectShaped(factory),
-    )
-
   def makeObjectShapedInstance[CC, K, V](
       toIterator: CC => Iterator[(K, V)],
       factory: Factory[(K, V), CC],
@@ -410,49 +367,19 @@ object LDCodec {
       decodeObjectShaped(factory),
     )
 
-  implicit def mapWithInfallibleEncodeInstance[
-      K: LDKeyCodec.WithInfallibleEncode,
-      V: LDCodecWithInfallibleEncode,
-  ]: LDCodecWithInfallibleEncode[Map[K, V]] =
-    makeObjectShapedWithInfallibleEncodeInstance[Map[K, V], K, V](_.iterator, Map)
-
   implicit def mapInstance[K: LDKeyCodec, V: LDCodec]: LDCodec[Map[K, V]] =
     makeObjectShapedInstance[Map[K, V], K, V](_.iterator, Map)
 
-  implicit def iterablePairsWithInfallibleEncodeInstance[
-      K: LDKeyCodec.WithInfallibleEncode,
-      V: LDCodecWithInfallibleEncode,
-  ]: LDCodecWithInfallibleEncode[Iterable[(K, V)]] =
-    makeObjectShapedWithInfallibleEncodeInstance[Iterable[(K, V)], K, V](_.iterator, Iterable)
-
   implicit def iterablePairsInstance[K: LDKeyCodec, V: LDCodec]: LDCodec[Iterable[(K, V)]] =
     makeObjectShapedInstance[Iterable[(K, V)], K, V](_.iterator, Iterable)
-
-  implicit def arrayPairsWithInfallibleEncodeInstance[
-      K: LDKeyCodec.WithInfallibleEncode,
-      V: LDCodecWithInfallibleEncode,
-  ](implicit ct: ClassTag[(K, V)]): LDCodecWithInfallibleEncode[Array[(K, V)]] =
-    makeObjectShapedWithInfallibleEncodeInstance[Array[(K, V)], K, V](_.iterator, Array)
 
   implicit def arrayPairsInstance[K: LDKeyCodec, V: LDCodec](implicit
       ct: ClassTag[(K, V)]
   ): LDCodec[Array[(K, V)]] =
     makeObjectShapedInstance[Array[(K, V)], K, V](_.iterator, Array)
 
-  implicit def vectorPairsWithInfallibleEncodeInstance[
-      K: LDKeyCodec.WithInfallibleEncode,
-      V: LDCodecWithInfallibleEncode,
-  ]: LDCodecWithInfallibleEncode[Vector[(K, V)]] =
-    makeObjectShapedWithInfallibleEncodeInstance[Vector[(K, V)], K, V](_.iterator, Vector)
-
   implicit def vectorPairsInstance[K: LDKeyCodec, V: LDCodec]: LDCodec[Vector[(K, V)]] =
     makeObjectShapedInstance[Vector[(K, V)], K, V](_.iterator, Vector)
-
-  implicit def listPairsWithInfallibleEncodeInstance[
-      K: LDKeyCodec.WithInfallibleEncode,
-      V: LDCodecWithInfallibleEncode,
-  ]: LDCodecWithInfallibleEncode[List[(K, V)]] =
-    makeObjectShapedWithInfallibleEncodeInstance[List[(K, V)], K, V](_.iterator, List)
 
   implicit def listPairsInstance[K: LDKeyCodec, V: LDCodec]: LDCodec[List[(K, V)]] =
     makeObjectShapedInstance[List[(K, V)], K, V](_.iterator, List)

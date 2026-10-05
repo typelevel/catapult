@@ -51,11 +51,11 @@ private object JsonLDCodecImplementation {
       _encode = (json, history) =>
         json.fold[LDCodecResult[LDValue]](
           jsonNull = LDValue.ofNull().validNec,
-          jsonBoolean = _.asLDValue.valid,
-          jsonNumber = _.asLDValueOrFailure(history),
-          jsonString = _.asLDValue.valid,
-          jsonArray = _.asLDValueOrFailure(history),
-          jsonObject = _.toIterable.asLDValueOrFailure(history),
+          jsonBoolean = _.asLDValue(history),
+          jsonNumber = _.asLDValue(history),
+          jsonString = _.asLDValue(history),
+          jsonArray = _.asLDValue(history),
+          jsonObject = _.toIterable.asLDValue(history),
         ),
       _decode = cursor =>
         cursor.valueType match {

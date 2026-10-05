@@ -31,7 +31,7 @@ object mtlClient {
   ) extends AnyVal {
     def circeVariation(featureKey: String, defaultValue: Json)(implicit F: MonadThrow[F]): F[Json] =
       defaultValue
-        .asLDValueOrFailure(LDCursorHistory.root)
+        .asLDValue(LDCursorHistory.root)
         .asEncodingFailure
         .liftTo[F]
         .flatMap(client.jsonValueVariation(featureKey, _))
