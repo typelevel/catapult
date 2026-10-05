@@ -158,7 +158,7 @@ object LDCodec {
     override def encode(n: N, history: LDCursorHistory): LDCodecResult[LDValue] = {
       val d = toDouble(n)
       Validated.condNec(
-        toDouble(n) == d,
+        fromDouble(d) == n,
         LDValue.of(d),
         LDCodecFailure(LDReason.undecodableValue(LDValueType.NUMBER, typeName), history),
       )
