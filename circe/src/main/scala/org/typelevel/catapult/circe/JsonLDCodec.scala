@@ -117,15 +117,16 @@ private object JsonLDCodecImplementation {
           LDCodecFailure(LDReason.unencodableValue(LDValueType.NUMBER, "JNumber"), history)
         }
         .toValidatedNec,
-    _.checkType(LDValueType.NUMBER).andThen { c =>
-      // Less of a hack on the encoding side, because circe can handle (most) doubles.
-      // The JVM double doesn't map cleanly to the JSON number, so this can fail as well.
-      LDCodec[Double]
-        .decode(c)
-        .map(Json.fromDouble(_).flatMap(_.asNumber))
-        .andThen(_.toValidNec {
-          c.fail(LDReason.undecodableValue(LDValueType.NUMBER, "JNumber"))
-        })
-    },
+    cursor =>
+      cursor.checkType(LDValueType.NUMBER).value.andThen { value =>
+        // Less of a hack on the encoding side, because circe can handle (most) doubles.
+        // The JVM double doesn't map cleanly to the JSON number, so this can fail as well.
+        LDCodec[Double]
+          .decode(value)
+          .map(Json.fromDouble(_).flatMap(_.asNumber))
+          .andThen(_.toValidNec {
+            cursor.fail(LDReason.undecodableValue(LDValueType.NUMBER, "JNumber"))
+          })
+      },
   )
 }

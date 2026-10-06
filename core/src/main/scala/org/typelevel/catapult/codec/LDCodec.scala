@@ -19,7 +19,7 @@ package org.typelevel.catapult.codec
 import cats.{Defer, Invariant}
 import cats.data.*
 import cats.syntax.all.*
-import com.launchdarkly.sdk.{LDValue, LDValueType}
+import com.launchdarkly.sdk.{ArrayBuilder, LDValue, LDValueType, ObjectBuilder}
 import org.typelevel.catapult.codec.LDCodec.LDCodecResult
 import org.typelevel.catapult.codec.LDReason.{unableToDecodeKey, unableToEncodeKey}
 
@@ -82,6 +82,8 @@ object LDCodec {
 
   type LDCodecResult[A] = ValidatedNec[LDCodecFailure, A]
 
+  /** Create an instance out of an encoder and decoder function
+    */
   def instance[A](
       _encode: (A, LDCursorHistory) => LDCodecResult[LDValue],
       _decode: LDCursor => LDCodecResult[A],
@@ -91,6 +93,28 @@ object LDCodec {
         _encode(a, history)
       override def decode(c: LDCursor): LDCodecResult[A] = _decode(c)
     }
+
+  /** Sugar to make building an instance for the `LDValue` type `ARRAY` less cumbersome
+    */
+  def arrInstance[A](
+      _encode: (A, LDCursorHistory) => ArrayBuilder => LDCodecResult[ArrayBuilder],
+      _decode: LDCursor.LDArrayCursor => LDCodecResult[A],
+  ): LDCodec[A] =
+    instance(
+      (value, history) => _encode(value, history)(LDValue.buildArray()).map(_.build()),
+      cursor => _decode(cursor.asArray),
+    )
+
+  /** Sugar to make building an instance for the `LDValue` type `OBJECT` less cumbersome
+    */
+  def objInstance[A](
+      _encode: (A, LDCursorHistory) => ObjectBuilder => LDCodecResult[ObjectBuilder],
+      _decode: LDCursor.LDObjectCursor => LDCodecResult[A],
+  ): LDCodec[A] =
+    instance(
+      (value, history) => _encode(value, history)(LDValue.buildObject()).map(_.build()),
+      cursor => _decode(cursor.asObject),
+    )
 
   final class DecodingFailure(val failures: NonEmptyChain[LDCodecFailure])
       extends IllegalArgumentException {
@@ -165,7 +189,7 @@ object LDCodec {
     }
 
     override def decode(c: LDCursor): LDCodecResult[N] =
-      c.checkType(LDValueType.NUMBER).map(_.value.doubleValue()).andThen { d =>
+      c.checkType(LDValueType.NUMBER).as[Double].andThen { d =>
         val n = fromDouble(d)
         Validated.condNec(
           toDouble(n) == d,
@@ -176,23 +200,23 @@ object LDCodec {
   }
 
   implicit val ldValueInstance: LDCodec[LDValue] =
-    instance((value, _) => value.valid, _.value.valid)
+    instance((value, _) => value.valid, _.value)
 
   implicit val booleanInstance: LDCodec[Boolean] = instance(
     (value, _) => LDValue.of(value).valid,
-    _.checkType(LDValueType.BOOLEAN).map(_.value.booleanValue()),
+    _.checkType(LDValueType.BOOLEAN).value.map(_.booleanValue()),
   )
 
   implicit val stringInstance: LDCodec[String] = instance(
     (value, _) => LDValue.of(value).valid,
-    _.checkType(LDValueType.STRING).map(_.value.stringValue()),
+    _.checkType(LDValueType.STRING).value.map(_.stringValue()),
   )
 
   // This is the canonical encoding of numbers in an LDValue, other
   // numerical types are derived from this because of this constraint.
   implicit val doubleInstance: LDCodec[Double] = instance(
     (value, _) => LDValue.of(value).valid,
-    _.checkType(LDValueType.NUMBER).map(_.value.doubleValue()),
+    _.checkType(LDValueType.NUMBER).value.map(_.doubleValue()),
   )
 
   implicit val floatInstance: LDCodec[Float] = numericInstance("Float", _.toDouble, _.toFloat)
@@ -203,7 +227,7 @@ object LDCodec {
 
   implicit val noneInstance: LDCodec[None.type] = instance(
     (_, _) => LDValue.ofNull().valid,
-    _.checkType(LDValueType.NULL).as(None),
+    _.checkType(LDValueType.NULL).value.as(None),
   )
 
   implicit def decodeSome[A, C[_] <: LDCodec[?]](implicit CA: C[A], I: Invariant[C]): C[Some[A]] =
@@ -218,13 +242,13 @@ object LDCodec {
 
   private def decodeIterableShaped[CC, A](factory: Factory[A, CC])(cursor: LDCursor)(implicit
       CA: LDCodec[A]
-  ): LDCodecResult[CC] = cursor.checkType(LDValueType.ARRAY).andThen { c =>
+  ): LDCodecResult[CC] = cursor.checkType(LDValueType.ARRAY).value.andThen { value =>
     val builder = factory.newBuilder
     val failures = Vector.newBuilder[LDCodecFailure]
-    builder.sizeHint(c.value.size())
+    builder.sizeHint(value.size())
     var idx = 0
-    c.value.values().forEach { ldValue =>
-      CA.decode(LDCursor.of(LDValue.normalize(ldValue), c.history.at(idx))) match {
+    value.values().forEach { ldValue =>
+      LDCursor.of(LDValue.normalize(ldValue), cursor.history.at(idx)).as(CA) match {
         case Validated.Invalid(e) => failures.addAll(e.iterator)
         case Validated.Valid(value) => builder.addOne(value)
       }
@@ -307,12 +331,12 @@ object LDCodec {
   private def decodeObjectShaped[CC, K, V](factory: Factory[(K, V), CC])(cursor: LDCursor)(implicit
       CK: LDKeyCodec[K],
       CV: LDCodec[V],
-  ): LDCodecResult[CC] = cursor.checkType(LDValueType.OBJECT).andThen { c =>
+  ): LDCodecResult[CC] = cursor.checkType(LDValueType.OBJECT).value.andThen { value =>
     val builder = factory.newBuilder
     val failures = Vector.newBuilder[LDCodecFailure]
-    builder.sizeHint(c.value.size())
-    c.value.keys().forEach { field =>
-      val updatedHistory = c.history.at(field)
+    builder.sizeHint(value.size())
+    value.keys().forEach { field =>
+      val updatedHistory = cursor.history.at(field)
       LDKeyCodec[K].decode(field) match {
         case Validated.Invalid(reasons) =>
           failures.addAll {
@@ -321,9 +345,7 @@ object LDCodec {
             }.iterator
           }
         case Validated.Valid(key) =>
-          LDCodec[V].decode(
-            LDCursor.of(LDValue.normalize(c.value.get(field)), updatedHistory)
-          ) match {
+          LDCursor.of(LDValue.normalize(value.get(field)), updatedHistory).as(CV) match {
             case Validated.Invalid(e) => failures.addAll(e.iterator)
             case Validated.Valid(value) => builder.addOne(key -> value)
           }
@@ -346,7 +368,7 @@ object LDCodec {
         val builder = LDValue.buildObject()
         val failures = Vector.newBuilder[LDCodecFailure]
         toIterator(cc).foreach { case (k, v) =>
-          LDKeyCodec[K].encode(k) match {
+          CK.encode(k) match {
             case Validated.Invalid(reasons) =>
               failures.addAll {
                 reasons.map { reason =>

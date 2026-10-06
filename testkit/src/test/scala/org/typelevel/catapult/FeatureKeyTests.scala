@@ -154,20 +154,13 @@ object FeatureKeyTests extends SimpleIOSuite {
     final case class Foo(a: String, b: Boolean)
 
     testClient.use { case (td, client) =>
-      implicit val codec: LDCodec[Foo] = LDCodec.instance[Foo](
-        (foo, _) =>
-          LDValue
-            .buildObject()
-            .put("a", foo.a)
-            .put("b", foo.b)
-            .build
-            .valid,
-        _.asObject.andThen { obj =>
+      implicit val codec: LDCodec[Foo] = LDCodec.objInstance[Foo](
+        (foo, _) => _.put("a", foo.a).put("b", foo.b).valid,
+        obj =>
           (
-            obj.at("a").andThen(_.as[String]),
-            obj.at("b").andThen(_.as[Boolean]),
-          ).mapN(Foo)
-        },
+            obj.at("a").as[String],
+            obj.at("b").as[Boolean],
+          ).mapN(Foo(_, _)),
       )
       val defaultFoo = Foo(a = "hi", b = false)
       for {
