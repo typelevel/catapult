@@ -15,7 +15,7 @@ ThisBuild / developers := List(
 ThisBuild / tlSitePublishBranch := Some("main")
 
 val Scala213 = "2.13.16"
-ThisBuild / crossScalaVersions := Seq(Scala213, "3.3.6")
+ThisBuild / crossScalaVersions := Seq(Scala213, "3.3.8")
 ThisBuild / scalaVersion := Scala213 // the default Scala
 
 lazy val root = tlCrossRootProject.aggregate(core, mtl, testkit, circe)
@@ -40,9 +40,9 @@ lazy val core = crossProject(JVMPlatform)
     name := "catapult",
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-core" % "2.13.0",
-      "org.typelevel" %%% "cats-effect" % "3.6.3",
+      "org.typelevel" %%% "cats-effect" % "3.6.4",
       "co.fs2" %%% "fs2-core" % "3.12.2",
-      "com.launchdarkly" % "launchdarkly-java-server-sdk" % "7.10.1",
+      "com.launchdarkly" % "launchdarkly-java-server-sdk" % "7.10.2",
     ),
   )
 
@@ -69,7 +69,7 @@ lazy val circe = crossProject(JVMPlatform)
     libraryDependencies ++= Seq(
       "io.circe" %% "circe-core" % "0.14.14",
       "io.circe" %% "circe-parser" % "0.14.14",
-      "org.scalameta" %% "munit-scalacheck" % "1.1.0" % Test,
+      "org.scalameta" %% "munit-scalacheck" % "1.3.1" % Test,
     ),
     tlVersionIntroduced := Map(
       "2.13" -> "0.7.0",
