@@ -69,7 +69,7 @@ lazy val circe = crossProject(JVMPlatform)
     libraryDependencies ++= Seq(
       "io.circe" %% "circe-core" % "0.14.14",
       "io.circe" %% "circe-parser" % "0.14.14",
-      "org.scalameta" %% "munit-scalacheck" % "1.1.0" % Test,
+      "org.scalameta" %% "munit-scalacheck" % "1.3.1" % Test,
     ),
     tlVersionIntroduced := Map(
       "2.13" -> "0.7.0",
