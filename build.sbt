@@ -14,7 +14,7 @@ ThisBuild / developers := List(
 // publish website from this branch
 ThisBuild / tlSitePublishBranch := Some("main")
 
-val Scala213 = "2.13.16"
+val Scala213 = "2.13.18"
 ThisBuild / crossScalaVersions := Seq(Scala213, "3.3.8")
 ThisBuild / scalaVersion := Scala213 // the default Scala
 
@@ -26,7 +26,7 @@ lazy val testkit = crossProject(JVMPlatform)
   .settings(
     name := "catapult-testkit",
     libraryDependencies ++= Seq(
-      "org.typelevel" %% "weaver-cats" % "0.9.3" % Test
+      "org.typelevel" %% "weaver-cats" % "0.13.0" % Test
     ),
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
     tlVersionIntroduced := List("2.13", "3").map(_ -> "0.1.0").toMap,
@@ -40,7 +40,7 @@ lazy val core = crossProject(JVMPlatform)
     name := "catapult",
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-core" % "2.13.0",
-      "org.typelevel" %%% "cats-effect" % "3.6.4",
+      "org.typelevel" %%% "cats-effect" % "3.7.1",
       "co.fs2" %%% "fs2-core" % "3.14.0",
       "com.launchdarkly" % "launchdarkly-java-server-sdk" % "7.17.2",
     ),
@@ -52,7 +52,7 @@ lazy val mtl = crossProject(JVMPlatform)
   .settings(
     name := "catapult-mtl",
     libraryDependencies ++= Seq(
-      "org.typelevel" %% "cats-mtl" % "1.5.0"
+      "org.typelevel" %% "cats-mtl" % "1.7.0"
     ),
     tlVersionIntroduced := Map(
       "2.13" -> "0.5.1",
@@ -67,8 +67,8 @@ lazy val circe = crossProject(JVMPlatform)
   .settings(
     name := "catapult-circe",
     libraryDependencies ++= Seq(
-      "io.circe" %% "circe-core" % "0.14.14",
-      "io.circe" %% "circe-parser" % "0.14.14",
+      "io.circe" %% "circe-core" % "0.14.17",
+      "io.circe" %% "circe-parser" % "0.14.17",
       "org.scalameta" %% "munit-scalacheck" % "1.3.1" % Test,
     ),
     tlVersionIntroduced := Map(
