@@ -51,11 +51,11 @@ private object JsonLDCodecImplementation {
       _encode = (json, history) =>
         json.fold[LDCodecResult[LDValue]](
           jsonNull = LDValue.ofNull().validNec,
-          jsonBoolean = _.asLDValue.valid,
-          jsonNumber = _.asLDValueOrFailure(history),
-          jsonString = _.asLDValue.valid,
-          jsonArray = _.asLDValueOrFailure(history),
-          jsonObject = _.toIterable.asLDValueOrFailure(history),
+          jsonBoolean = _.asLDValue(history),
+          jsonNumber = _.asLDValue(history),
+          jsonString = _.asLDValue(history),
+          jsonArray = _.asLDValue(history),
+          jsonObject = _.toIterable.asLDValue(history),
         ),
       _decode = cursor =>
         cursor.valueType match {
@@ -117,15 +117,16 @@ private object JsonLDCodecImplementation {
           LDCodecFailure(LDReason.unencodableValue(LDValueType.NUMBER, "JNumber"), history)
         }
         .toValidatedNec,
-    _.checkType(LDValueType.NUMBER).andThen { c =>
-      // Less of a hack on the encoding side, because circe can handle (most) doubles.
-      // The JVM double doesn't map cleanly to the JSON number, so this can fail as well.
-      LDCodec[Double]
-        .decode(c)
-        .map(Json.fromDouble(_).flatMap(_.asNumber))
-        .andThen(_.toValidNec {
-          c.fail(LDReason.undecodableValue(LDValueType.NUMBER, "JNumber"))
-        })
-    },
+    cursor =>
+      cursor.checkType(LDValueType.NUMBER).value.andThen { value =>
+        // Less of a hack on the encoding side, because circe can handle (most) doubles.
+        // The JVM double doesn't map cleanly to the JSON number, so this can fail as well.
+        LDCodec[Double]
+          .decode(value)
+          .map(Json.fromDouble(_).flatMap(_.asNumber))
+          .andThen(_.toValidNec {
+            cursor.fail(LDReason.undecodableValue(LDValueType.NUMBER, "JNumber"))
+          })
+      },
   )
 }

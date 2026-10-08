@@ -18,10 +18,11 @@ package org.typelevel.catapult
 
 import cats.syntax.all.*
 import cats.Show
+import cats.data.NonEmptyChain
 import cats.kernel.Hash
 import com.launchdarkly.sdk.LDValue
 import org.typelevel.catapult.codec.LDCodec.LDCodecResult
-import org.typelevel.catapult.codec.{LDCodec, LDCodecWithInfallibleEncode, LDCursorHistory}
+import org.typelevel.catapult.codec.{LDCodec, LDCodecFailure, LDCursorHistory}
 import org.typelevel.catapult.instances.*
 
 /** Defines a Launch Darkly key, it's expected type, and a default value
@@ -38,23 +39,37 @@ object FeatureKey {
     type Type = T
   }
 
+  final case class InvalidDefault[A](
+      key: String,
+      default: A,
+      encodingErrors: NonEmptyChain[LDCodecFailure],
+  ) extends IllegalArgumentException(
+        s"FeatureKey $key defined with default that cannot be encoded in an LDValue"
+      )
+
   /** Define a feature key that is expected to return a value of type `A`
+    *
     * @param key
     *   the key of the flag
     * @param default
     *   a value to return if the retrieval fails or the value cannot be decoded to an `A`
+    * @return
+    *  `LDCodecResult[FeatureKey.Aux[A]]` instead of `FeatureKey.Aux[A]` because many unremarkable
+    *  values cannot be encoded in an `LDValue`
     */
-  def instance[A: LDCodecWithInfallibleEncode](key: String, default: A): FeatureKey.Aux[A] =
-    new Impl[A](key, default, LDCodecWithInfallibleEncode[A].safeEncode(default))
+  def instance[A: LDCodec](key: String, default: A): LDCodecResult[FeatureKey.Aux[A]] =
+    LDCodec[A].encode(default, LDCursorHistory.root).map(new Impl[A](key, default, _))
 
   /** Define a feature key that is expected to return a value of type `A`
     * @param key
     *   the key of the flag
     * @param default
     *   a value to return if the retrieval fails or the value cannot be decoded to an `A`
+    * @throws InvalidDefault
+    *   when `default` cannot be encoded in an `LDValue`
     */
-  def instanceOrFailure[A: LDCodec](key: String, default: A): LDCodecResult[FeatureKey.Aux[A]] =
-    LDCodec[A].encode(default, LDCursorHistory.root).map(new Impl[A](key, default, _))
+  def instanceUnsafe[A: LDCodec](key: String, default: A): FeatureKey.Aux[A] =
+    instance(key, default).valueOr(errors => throw InvalidDefault(key, default, errors))
 
   /** Define a feature key that is expected to return a boolean value.
     * @param key
@@ -62,7 +77,14 @@ object FeatureKey {
     * @param default
     *   a value to return if the retrieval fails or the type is not expected
     */
-  def bool(key: String, default: Boolean): FeatureKey.Aux[Boolean] = instance[Boolean](key, default)
+  def bool(key: String, default: Boolean): LDCodecResult[FeatureKey.Aux[Boolean]] =
+    instance[Boolean](key, default)
+
+  /** @see [[FeatureKey.bool]]
+    * @see [[FeatureKey.instanceUnsafe]]
+    */
+  def boolUnsafe(key: String, default: Boolean): FeatureKey.Aux[Boolean] =
+    instanceUnsafe[Boolean](key, default)
 
   /** Define a feature key that is expected to return a string value.
     * @param key
@@ -70,7 +92,14 @@ object FeatureKey {
     * @param default
     *   a value to return if the retrieval fails or the type is not expected
     */
-  def string(key: String, default: String): FeatureKey.Aux[String] = instance[String](key, default)
+  def string(key: String, default: String): LDCodecResult[FeatureKey.Aux[String]] =
+    instance[String](key, default)
+
+  /** @see [[FeatureKey.string]]
+    * @see [[FeatureKey.instanceUnsafe]]
+    */
+  def stringUnsafe(key: String, default: String): FeatureKey.Aux[String] =
+    instanceUnsafe[String](key, default)
 
   /** Define a feature key that is expected to return a integer value.
     * @param key
@@ -79,7 +108,13 @@ object FeatureKey {
     *   a value to return if the retrieval fails or the type is not expected
     */
   def int(key: String, default: Int): LDCodecResult[FeatureKey.Aux[Int]] =
-    instanceOrFailure[Int](key, default)
+    instance[Int](key, default)
+
+  /** @see [[FeatureKey.int]]
+    * @see [[FeatureKey.instanceUnsafe]]
+    */
+  def intUnsafe(key: String, default: Int): FeatureKey.Aux[Int] =
+    instanceUnsafe[Int](key, default)
 
   /** Define a feature key that is expected to return a double value.
     * @param key
@@ -87,7 +122,14 @@ object FeatureKey {
     * @param default
     *   a value to return if the retrieval fails or the type is not expected
     */
-  def double(key: String, default: Double): FeatureKey.Aux[Double] = instance[Double](key, default)
+  def double(key: String, default: Double): LDCodecResult[FeatureKey.Aux[Double]] =
+    instance[Double](key, default)
+
+  /** @see [[FeatureKey.double]]
+    * @see [[FeatureKey.instanceUnsafe]]
+    */
+  def doubleUnsafe(key: String, default: Double): FeatureKey.Aux[Double] =
+    instanceUnsafe[Double](key, default)
 
   /** Define a feature key that is expected to return a JSON value.
     *

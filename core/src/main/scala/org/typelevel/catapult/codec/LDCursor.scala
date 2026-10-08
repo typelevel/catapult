@@ -17,7 +17,7 @@
 package org.typelevel.catapult.codec
 
 import cats.Show
-import cats.data.ValidatedNec
+import cats.data.{Chain, NonEmptyChain, ValidatedNec}
 import cats.kernel.Hash
 import cats.syntax.all.*
 import com.launchdarkly.sdk.{LDValue, LDValueType}
@@ -32,11 +32,11 @@ sealed trait LDCursor {
 
   /** The current value pointed to by the cursor.
     *
-    * @note This is guaranteed to be non-null
+    * @note This is guaranteed to be non-null, but may be `LDValue.ofNull`
     */
-  def value: LDValue
+  def value: ValidatedNec[LDCodecFailure, LDValue]
 
-  def valueType: LDValueType = value.getType
+  def valueType: LDValueType = value.fold(_ => LDValueType.NULL, _.getType)
 
   /** The path to the current value
     */
@@ -51,18 +51,19 @@ sealed trait LDCursor {
   /** Ensure the type of `value` matches the expected `LDValueType`
     *
     * @see [[asArray]] if the expected type is `ARRAY`
+    * @see [[asObject]] if the expected type is `OBJECT`
     */
-  def checkType(expected: LDValueType): ValidatedNec[LDCodecFailure, LDCursor]
+  def checkType(expected: LDValueType): LDCursor
 
   /** Ensure the type of `value` is `ARRAY` and return an `LDCursor`
     * specialized to working with `LDValue` arrays
     */
-  def asArray: ValidatedNec[LDCodecFailure, LDArrayCursor]
+  def asArray: LDArrayCursor
 
   /** Ensure the type of `value` is `OBJECT` and return an `LDCursor`
     * specialized to working with `LDValue` objects
     */
-  def asObject: ValidatedNec[LDCodecFailure, LDObjectCursor]
+  def asObject: LDObjectCursor
 
   override def toString: String = LDCursor.show.show(this)
 
@@ -81,7 +82,13 @@ object LDCursor {
     new Impl(LDValue.normalize(value), history)
 
   implicit val show: Show[LDCursor] = Show.show(c => show"LDCursor(${c.value}, ${c.history}")
-  implicit val hash: Hash[LDCursor] = Hash.by(c => (c.value, c.history))
+  implicit val hash: Hash[LDCursor] = Hash.by { c =>
+    (
+      c.value.getOrElse(LDValue.ofNull()),
+      c.value.fold(_.toChain, _ => Chain.empty),
+      c.history,
+    )
+  }
 
   /** An [[LDCursor]] that is specialized to work with `LDValue` arrays
     */
@@ -91,14 +98,14 @@ object LDCursor {
       *
       * @note Bounds checking will be done on `index`
       */
-    def at(index: Int): ValidatedNec[LDCodecFailure, LDCursor]
+    def at(index: Int): LDCursor
 
     /** Attempt to decode the value at the given index as an `A`
       *
       * @note Bounds checking will be done on `index`
       */
     def get[A: LDCodec](index: Int): ValidatedNec[LDCodecFailure, A] =
-      at(index).andThen(_.as[A])
+      at(index).as[A]
   }
 
   /** An [[LDCursor]] that is specialized to work with `LDValue` objects
@@ -107,88 +114,121 @@ object LDCursor {
 
     /** Descend to value at the given field
       */
-    def at(field: String): ValidatedNec[LDCodecFailure, LDCursor]
+    def at(field: String): LDCursor
 
     /** Attempt to decode the value the given field as an `A`
       */
     def get[A: LDCodec](field: String): ValidatedNec[LDCodecFailure, A] =
-      at(field).andThen(_.as[A])
+      at(field).as[A]
   }
 
-  private final class Impl(override val value: LDValue, override val history: LDCursorHistory)
+  private final class Impl(ldValue: LDValue, override val history: LDCursorHistory)
       extends LDCursor {
-    override def as[A: LDCodec]: ValidatedNec[LDCodecFailure, A] = LDCodec[A].decode(value)
 
-    override def checkType(expected: LDValueType): ValidatedNec[LDCodecFailure, LDCursor] =
-      value.getType match {
+    override def value: ValidatedNec[LDCodecFailure, LDValue] = ldValue.valid
+
+    override def as[A: LDCodec]: ValidatedNec[LDCodecFailure, A] = LDCodec[A].decode(ldValue)
+
+    override def checkType(expected: LDValueType): LDCursor =
+      ldValue.getType match {
         case actual if actual != expected =>
-          LDCodecFailure.failed(wrongType(expected, value.getType), history)
-        case LDValueType.ARRAY => new ArrayCursorImpl(value, history).valid
-        case LDValueType.OBJECT => new ObjectCursorImpl(value, history).valid
-        case _ => new Impl(value, history).valid
+          FailedCursor.one(wrongType(expected, ldValue.getType), history)
+        case LDValueType.ARRAY => new ArrayCursorImpl(ldValue, history)
+        case LDValueType.OBJECT => new ObjectCursorImpl(ldValue, history)
+        case _ => this
       }
 
-    override def asArray: ValidatedNec[LDCodecFailure, LDArrayCursor] =
-      if (value.getType == LDValueType.ARRAY) new ArrayCursorImpl(value, history).valid
-      else LDCodecFailure.failed(wrongType(LDValueType.ARRAY, value.getType), history)
+    override def asArray: LDArrayCursor =
+      if (ldValue.getType == LDValueType.ARRAY) new ArrayCursorImpl(ldValue, history)
+      else
+        FailedCursor.one(wrongType(LDValueType.ARRAY, ldValue.getType), history)
 
-    override def asObject: ValidatedNec[LDCodecFailure, LDObjectCursor] =
-      if (value.getType == LDValueType.OBJECT) new ObjectCursorImpl(value, history).valid
-      else LDCodecFailure.failed(wrongType(LDValueType.OBJECT, value.getType), history)
+    override def asObject: LDObjectCursor =
+      if (ldValue.getType == LDValueType.OBJECT) new ObjectCursorImpl(ldValue, history)
+      else FailedCursor.one(wrongType(LDValueType.OBJECT, ldValue.getType), history)
+  }
+
+  private final class FailedCursor(failures: NonEmptyChain[LDCodecFailure])
+      extends LDCursor
+      with LDArrayCursor
+      with LDObjectCursor {
+    override def value: ValidatedNec[LDCodecFailure, LDValue] = failures.invalid
+
+    override def as[A: LDCodec]: ValidatedNec[LDCodecFailure, A] = failures.invalid
+
+    override def checkType(expected: LDValueType): LDCursor = this
+
+    override def asArray: LDArrayCursor = this
+
+    override def asObject: LDObjectCursor = this
+
+    override def at(index: Int): LDCursor = this
+
+    override def at(field: String): LDCursor = this
+
+    override def history: LDCursorHistory = failures.head.history
+  }
+  private object FailedCursor {
+    def one(reason: LDReason, history: LDCursorHistory): FailedCursor =
+      new FailedCursor(NonEmptyChain.one(LDCodecFailure(reason, history)))
   }
 
   private final class ArrayCursorImpl(
-      override val value: LDValue,
+      ldValue: LDValue,
       override val history: LDCursorHistory,
   ) extends LDArrayCursor {
-    override def as[A: LDCodec]: ValidatedNec[LDCodecFailure, A] = LDCodec[A].decode(this)
+    override def value: ValidatedNec[LDCodecFailure, LDValue] = ldValue.valid
 
-    override def checkType(expected: LDValueType): ValidatedNec[LDCodecFailure, LDCursor] =
-      if (expected == LDValueType.ARRAY) this.valid
-      else LDCodecFailure.failed(wrongType(expected, value.getType), history)
+    override def as[A: LDCodec]: ValidatedNec[LDCodecFailure, A] = LDCodec[A].decode(ldValue)
 
-    override def asObject: ValidatedNec[LDCodecFailure, LDObjectCursor] =
-      LDCodecFailure.failed(wrongType(LDValueType.OBJECT, value.getType), history)
+    override def checkType(expected: LDValueType): LDCursor =
+      if (expected == LDValueType.ARRAY) this
+      else FailedCursor.one(wrongType(expected, ldValue.getType), history)
 
-    override def asArray: ValidatedNec[LDCodecFailure, LDArrayCursor] = this.valid
+    override def asObject: LDObjectCursor =
+      FailedCursor.one(wrongType(LDValueType.OBJECT, ldValue.getType), history)
 
-    override def at(index: Int): ValidatedNec[LDCodecFailure, LDCursor] = {
+    override def asArray: LDArrayCursor = this
+
+    override def at(index: Int): LDCursor = {
       val updatedHistory = history.at(index)
-      if (index >= 0 && index < value.size())
-        new Impl(LDValue.normalize(value.get(index)), updatedHistory).valid
-      else LDCodecFailure.failed(IndexOutOfBounds, updatedHistory)
+      if (index >= 0 && index < ldValue.size())
+        new Impl(LDValue.normalize(ldValue.get(index)), updatedHistory)
+      else FailedCursor.one(IndexOutOfBounds, updatedHistory)
     }
   }
 
   private final class ObjectCursorImpl(
-      override val value: LDValue,
+      ldValue: LDValue,
       override val history: LDCursorHistory,
   ) extends LDObjectCursor {
-    override def as[A: LDCodec]: ValidatedNec[LDCodecFailure, A] = LDCodec[A].decode(this)
+    override def value: ValidatedNec[LDCodecFailure, LDValue] = ldValue.valid
 
-    override def checkType(expected: LDValueType): ValidatedNec[LDCodecFailure, LDCursor] =
-      if (expected == LDValueType.OBJECT) this.valid
-      else LDCodecFailure.failed(wrongType(expected, value.getType), history)
+    override def as[A: LDCodec]: ValidatedNec[LDCodecFailure, A] = LDCodec[A].decode(ldValue)
 
-    override def asObject: ValidatedNec[LDCodecFailure, LDObjectCursor] = this.valid
+    override def checkType(expected: LDValueType): LDCursor =
+      if (expected == LDValueType.OBJECT) this
+      else FailedCursor.one(wrongType(expected, ldValue.getType), history)
 
-    override def asArray: ValidatedNec[LDCodecFailure, LDArrayCursor] =
-      LDCodecFailure.failed(wrongType(LDValueType.ARRAY, value.getType), history)
+    override def asObject: LDObjectCursor = this
 
-    override def at(field: String): ValidatedNec[LDCodecFailure, LDCursor] = {
+    override def asArray: LDArrayCursor =
+      FailedCursor.one(wrongType(LDValueType.ARRAY, ldValue.getType), history)
+
+    override def at(field: String): LDCursor = {
       val updatedHistory = history.at(field)
-      val result = LDValue.normalize(value.get(field))
-      if (!result.isNull) new Impl(result, updatedHistory).valid
+      val result = LDValue.normalize(ldValue.get(field))
+      if (!result.isNull) new Impl(result, updatedHistory)
       else {
         // LDValue.get returns null when a field is missing, we can do better
         var found = false
-        value.keys().iterator().forEachRemaining { key =>
+        ldValue.keys().iterator().forEachRemaining { key =>
           if (key == field) {
             found = true
           }
         }
-        if (found) new Impl(result, updatedHistory).valid
-        else LDCodecFailure.failed(missingField, updatedHistory)
+        if (found) new Impl(result, updatedHistory)
+        else FailedCursor.one(missingField, updatedHistory)
       }
     }
   }

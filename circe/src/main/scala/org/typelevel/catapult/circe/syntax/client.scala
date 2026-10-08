@@ -33,7 +33,7 @@ object client {
         implicit F: MonadThrow[F]
     ): F[Json] =
       defaultValue
-        .asLDValueOrFailure(LDCursorHistory.root)
+        .asLDValue(LDCursorHistory.root)
         .asEncodingFailure
         .liftTo[F]
         .flatMap(client.jsonValueVariation(featureKey, ctx, _))
