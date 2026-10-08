@@ -68,7 +68,7 @@ object FeatureKey {
     * @throws InvalidDefault
     *   when `default` cannot be encoded in an `LDValue`
     */
-  def instanceOrDie[A: LDCodec](key: String, default: A): FeatureKey.Aux[A] =
+  def instanceUnsafe[A: LDCodec](key: String, default: A): FeatureKey.Aux[A] =
     instance(key, default).valueOr(errors => throw InvalidDefault(key, default, errors))
 
   /** Define a feature key that is expected to return a boolean value.
@@ -81,10 +81,10 @@ object FeatureKey {
     instance[Boolean](key, default)
 
   /** @see [[FeatureKey.bool]]
-    * @see [[FeatureKey.instanceOrDie]]
+    * @see [[FeatureKey.instanceUnsafe]]
     */
-  def boolOrDie(key: String, default: Boolean): FeatureKey.Aux[Boolean] =
-    instanceOrDie[Boolean](key, default)
+  def boolUnsafe(key: String, default: Boolean): FeatureKey.Aux[Boolean] =
+    instanceUnsafe[Boolean](key, default)
 
   /** Define a feature key that is expected to return a string value.
     * @param key
@@ -96,10 +96,10 @@ object FeatureKey {
     instance[String](key, default)
 
   /** @see [[FeatureKey.string]]
-    * @see [[FeatureKey.instanceOrDie]]
+    * @see [[FeatureKey.instanceUnsafe]]
     */
-  def stringOrDie(key: String, default: String): FeatureKey.Aux[String] =
-    instanceOrDie[String](key, default)
+  def stringUnsafe(key: String, default: String): FeatureKey.Aux[String] =
+    instanceUnsafe[String](key, default)
 
   /** Define a feature key that is expected to return a integer value.
     * @param key
@@ -111,10 +111,10 @@ object FeatureKey {
     instance[Int](key, default)
 
   /** @see [[FeatureKey.int]]
-    * @see [[FeatureKey.instanceOrDie]]
+    * @see [[FeatureKey.instanceUnsafe]]
     */
-  def intOrDie(key: String, default: Int): FeatureKey.Aux[Int] =
-    instanceOrDie[Int](key, default)
+  def intUnsafe(key: String, default: Int): FeatureKey.Aux[Int] =
+    instanceUnsafe[Int](key, default)
 
   /** Define a feature key that is expected to return a double value.
     * @param key
@@ -126,10 +126,10 @@ object FeatureKey {
     instance[Double](key, default)
 
   /** @see [[FeatureKey.double]]
-    * @see [[FeatureKey.instanceOrDie]]
+    * @see [[FeatureKey.instanceUnsafe]]
     */
-  def doubleOrDie(key: String, default: Double): FeatureKey.Aux[Double] =
-    instanceOrDie[Double](key, default)
+  def doubleUnsafe(key: String, default: Double): FeatureKey.Aux[Double] =
+    instanceUnsafe[Double](key, default)
 
   /** Define a feature key that is expected to return a JSON value.
     *

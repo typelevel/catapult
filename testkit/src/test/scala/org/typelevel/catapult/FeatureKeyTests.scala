@@ -29,7 +29,7 @@ object FeatureKeyTests extends SimpleIOSuite {
   test("serve boolean variations through FeatureFlag") {
     testClient.use { case (td, client) =>
       for {
-        fk <- IO(FeatureKey.boolOrDie("test", true))
+        fk <- IO(FeatureKey.boolUnsafe("test", true))
         default <- client.variation(fk, ctx)
         _ <- IO(td.update(td.flag(fk.key).valueForAll(LDValue.of(false))))
         notDefault <- client.variation(fk, ctx)
@@ -40,7 +40,7 @@ object FeatureKeyTests extends SimpleIOSuite {
   test("serve string variations through FeatureFlag") {
     testClient.use { case (td, client) =>
       for {
-        fk <- IO(FeatureKey.stringOrDie("test", "default"))
+        fk <- IO(FeatureKey.stringUnsafe("test", "default"))
         default <- client.variation(fk, ctx)
         _ <- IO(td.update(td.flag(fk.key).valueForAll(LDValue.of("not-default"))))
         notDefault <- client.variation(fk, ctx)
@@ -51,7 +51,7 @@ object FeatureKeyTests extends SimpleIOSuite {
   test("serve int variations through FeatureFlag") {
     testClient.use { case (td, client) =>
       for {
-        fk <- IO(FeatureKey.intOrDie("test", 10))
+        fk <- IO(FeatureKey.intUnsafe("test", 10))
         default <- client.variation(fk, ctx)
         _ <- IO(td.update(td.flag(fk.key).valueForAll(LDValue.of(-10))))
         notDefault <- client.variation(fk, ctx)
@@ -62,7 +62,7 @@ object FeatureKeyTests extends SimpleIOSuite {
   test("serve double variations through FeatureFlag") {
     testClient.use { case (td, client) =>
       for {
-        fk <- IO(FeatureKey.doubleOrDie("test", 2d))
+        fk <- IO(FeatureKey.doubleUnsafe("test", 2d))
         default <- client.variation(fk, ctx)
         _ <- IO(td.update(td.flag(fk.key).valueForAll(LDValue.of(-2d))))
         notDefault <- client.variation(fk, ctx)
@@ -87,7 +87,7 @@ object FeatureKeyTests extends SimpleIOSuite {
       val arrayOfOne = Vector(1)
       def arrayOfMany = Vector(1, 10)
       for {
-        fk <- IO(FeatureKey.instanceOrDie("test", emptyArray))
+        fk <- IO(FeatureKey.instanceUnsafe("test", emptyArray))
         default <- client.variation(fk, ctx)
         _ <- IO(
           td.update(
@@ -127,7 +127,7 @@ object FeatureKeyTests extends SimpleIOSuite {
         "bar" -> false,
       )
       for {
-        fk <- IO(FeatureKey.instanceOrDie("test", emptyMap))
+        fk <- IO(FeatureKey.instanceUnsafe("test", emptyMap))
         default <- client.variation(fk, ctx)
         _ <- IO(td.update(td.flag(fk.key).valueForAll {
           LDValue
@@ -164,7 +164,7 @@ object FeatureKeyTests extends SimpleIOSuite {
       )
       val defaultFoo = Foo(a = "hi", b = false)
       for {
-        fk <- IO(FeatureKey.instanceOrDie("test", defaultFoo))
+        fk <- IO(FeatureKey.instanceUnsafe("test", defaultFoo))
         default <- client.variation(fk, ctx)
         _ <- IO(td.update(td.flag(fk.key).valueForAll {
           LDValue
