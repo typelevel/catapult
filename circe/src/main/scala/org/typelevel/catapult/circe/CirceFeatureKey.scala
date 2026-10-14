@@ -38,7 +38,7 @@ object CirceFeatureKey {
       key: String,
       default: Json,
   ): LDCodecResult[FeatureKey.Aux[Json]] =
-    FeatureKey.instanceOrFailure(key, default)
+    FeatureKey.instance(key, default)
 
   /** Define a feature key that is expected to return a JSON value.
     *
@@ -55,6 +55,6 @@ object CirceFeatureKey {
       default: A,
   ): LDCodecResult[FeatureKey.Aux[A]] = {
     implicit val ldCodec: LDCodec[A] = JsonLDCodec.ldCodecFromCirceCodec[A]
-    FeatureKey.instanceOrFailure(key, default)
+    FeatureKey.instance(key, default)
   }
 }

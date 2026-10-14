@@ -22,10 +22,8 @@ import org.typelevel.catapult.codec.LDCodec.LDCodecResult
 
 object syntax {
   implicit final class LDCursorEncodeOps[A](private val a: A) extends AnyVal {
-    def asLDValue(implicit CA: LDCodecWithInfallibleEncode[A]): LDValue = CA.safeEncode(a)
-    def asLDValueOrFailure(history: LDCursorHistory)(implicit
-        CA: LDCodec[A]
-    ): LDCodecResult[LDValue] = CA.encode(a, history)
+    def asLDValue(history: LDCursorHistory)(implicit CA: LDCodec[A]): LDCodecResult[LDValue] =
+      CA.encode(a, history)
   }
 
   implicit final class LDValueDecodeOps(private val ldValue: LDValue) extends AnyVal {
