@@ -42,7 +42,7 @@ lazy val core = crossProject(JVMPlatform)
       "org.typelevel" %%% "cats-core" % "2.13.0",
       "org.typelevel" %%% "cats-effect" % "3.7.1",
       "co.fs2" %%% "fs2-core" % "3.14.0",
-      "com.launchdarkly" % "launchdarkly-java-server-sdk" % "7.17.2",
+      "com.launchdarkly" % "launchdarkly-java-server-sdk" % "7.17.3",
     ),
   )
 
